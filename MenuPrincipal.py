@@ -24,22 +24,22 @@ except AttributeError:
 # COLORES
 # ============================================================
 
-ROJO = "#A92718"
-ROJO_CLARO = "#D93A20"
-ROJO_OSCURO = "#7E1D14"
+ROJO = "#C0392B"
+ROJO_CLARO = "#D1382A"
+ROJO_OSCURO = "#7A2418"
 
 CREMA = "#FBF0DC"
 CREMA_CLARO = "#FFF9ED"
 BLANCO = "#FFFFFF"
 
-NARANJA = "#E98A20"
+NARANJA = "#E8963C"
 NARANJA_CLARO = "#F5A623"
 
 VERDE = "#4CAF50"
 
-TEXTO = "#292929"
+TEXTO = "#2B2118"
 GRIS = "#777777"
-BORDE = "#E5D8C4"
+BORDE = "#D9C9A8"
 
 # ============================================================
 # RUTA DEL LOGO GENERAL
@@ -48,42 +48,166 @@ BORDE = "#E5D8C4"
 # ============================================================
 
 CARPETA_BASE = os.path.dirname(os.path.abspath(__file__))
-CARPETA_LOGO = os.path.join(CARPETA_BASE, "recursos")
+
+
+def _resolver_carpeta_recursos(base):
+    """Devuelve la carpeta 'Recursos' del proyecto sin importar si
+    está escrita en mayúsculas o minúsculas (compatibilidad entre
+    sistemas operativos)."""
+
+    for nombre in ("Recursos", "recursos"):
+        ruta = os.path.join(base, nombre)
+        if os.path.isdir(ruta):
+            return ruta
+
+    return os.path.join(base, "Recursos")
+
+
+def _resolver_carpeta_decoraciones(base):
+    """Devuelve la carpeta 'Decoraciones' del proyecto sin importar
+    si está escrita en mayúsculas o minúsculas."""
+
+    for nombre in ("Decoraciones", "decoraciones"):
+        ruta = os.path.join(base, nombre)
+        if os.path.isdir(ruta):
+            return ruta
+
+    return os.path.join(base, "Decoraciones")
+
+
+CARPETA_LOGO = _resolver_carpeta_recursos(CARPETA_BASE)
+CARPETA_DECORACIONES = _resolver_carpeta_decoraciones(CARPETA_BASE)
 NOMBRE_LOGO = "Logotipo"
 
 
 # ============================================================
-# PRODUCTOS
+# HORARIOS DEL MENÚ
+# ============================================================
+# De 7:00 a 10:59 se muestra únicamente el menú de desayunos.
+# Del resto del día (11:00 a 6:59, es decir tarde, noche y
+# madrugada) se muestra únicamente el menú de almuerzo.
 # ============================================================
 
-PRODUCTOS = [
+HORA_INICIO_DESAYUNO = 7
+HORA_FIN_DESAYUNO = 11
+
+
+def obtener_periodo_actual():
+    """Devuelve 'desayuno' o 'almuerzo' según la hora del sistema."""
+
+    import datetime
+
+    hora = datetime.datetime.now().hour
+
+    if HORA_INICIO_DESAYUNO <= hora < HORA_FIN_DESAYUNO:
+        return "desayuno"
+
+    return "almuerzo"
+
+
+# ============================================================
+# PRODUCTOS - MENÚ DE DESAYUNO (7:00 - 10:59)
+# ============================================================
+
+PRODUCTOS_DESAYUNO = [
+    {
+        "nombre": "Desayuno\nClásico",
+        "descripcion": "Huevos, tocino,\npan tostado",
+        "precio": 45,
+        "categoria": "comida",
+        "emoji": "🍳"
+    },
+    {
+        "nombre": "Pancakes",
+        "descripcion": "Con miel y\nmantequilla",
+        "precio": 35,
+        "categoria": "comida",
+        "emoji": "🥞"
+    },
+    {
+        "nombre": "Sandwich\nde Huevo",
+        "descripcion": "Pan artesanal",
+        "precio": 30,
+        "categoria": "comida",
+        "emoji": "🥪"
+    },
+    {
+        "nombre": "Café\nAmericano",
+        "descripcion": "",
+        "precio": 15,
+        "categoria": "bebidas",
+        "emoji": "☕"
+    },
+    {
+        "nombre": "Jugo de\nNaranja",
+        "descripcion": "Natural",
+        "precio": 18,
+        "categoria": "bebidas",
+        "emoji": "🧃"
+    },
+    {
+        "nombre": "Chocolate\nCaliente",
+        "descripcion": "",
+        "precio": 20,
+        "categoria": "bebidas",
+        "emoji": "🍫"
+    },
+    {
+        "nombre": "Muffin de\nArándanos",
+        "descripcion": "",
+        "precio": 20,
+        "categoria": "postres",
+        "emoji": "🧁"
+    },
+    {
+        "nombre": "Fruta\nPicada",
+        "descripcion": "De temporada",
+        "precio": 18,
+        "categoria": "postres",
+        "emoji": "🍓"
+    },
+    {
+        "nombre": "Combo\nDesayuno",
+        "descripcion": "Desayuno +\ncafé + jugo",
+        "precio": 70,
+        "categoria": "combos",
+        "emoji": "🍽"
+    },
+]
+
+
+# ============================================================
+# PRODUCTOS - MENÚ DE ALMUERZO (11:00 - 6:59)
+# ============================================================
+
+PRODUCTOS_ALMUERZO = [
     {
         "nombre": "Hamburguesa\nClásica",
-        "descripcion": "Ensalada,\ntomate, cebolla",
+        "descripcion": "Lechuga,\ntomate, cebolla",
         "precio": 85,
-        "categoria": "hamburguesas",
+        "categoria": "comida",
         "emoji": "🍔"
     },
     {
-        "nombre": "Pizza\nMargherita",
-        "descripcion": "",
-        "precio": 120,
-        "categoria": "pizza",
-        "emoji": "🍕"
+        "nombre": "Hamburguesa\nDoble",
+        "descripcion": "Doble carne,\ndoble queso",
+        "precio": 105,
+        "categoria": "comida",
+        "emoji": "🍔"
     },
     {
-        "nombre": "Pasta Boloñesa",
+        "nombre": "Papas\nFritas",
         "descripcion": "",
-        "precio": 65,
-        "categoria": "pasta",
-        "emoji": "🍝"
+        "precio": 25,
+        "categoria": "comida",
+        "emoji": "🍟"
     },
     {
-        "nombre": "Ensalada César",
-        "descripcion": "",
-        "precio": 60,
-        "categoria": "ensaladas",
-        "emoji": "🥗"
+        "nombre": "Alitas\nBBQ",
+        "descripcion": "8 unidades",
+        "precio": 55,
+        "categoria": "comida",
+        "emoji": "🍗"
     },
     {
         "nombre": "Limonada\nNatural",
@@ -91,7 +215,49 @@ PRODUCTOS = [
         "precio": 25,
         "categoria": "bebidas",
         "emoji": "🍋"
-    }
+    },
+    {
+        "nombre": "Gaseosa",
+        "descripcion": "",
+        "precio": 15,
+        "categoria": "bebidas",
+        "emoji": "🥤"
+    },
+    {
+        "nombre": "Malteada",
+        "descripcion": "Vainilla o\nchocolate",
+        "precio": 28,
+        "categoria": "bebidas",
+        "emoji": "🥛"
+    },
+    {
+        "nombre": "Helado",
+        "descripcion": "",
+        "precio": 22,
+        "categoria": "postres",
+        "emoji": "🍨"
+    },
+    {
+        "nombre": "Brownie",
+        "descripcion": "Con nuez",
+        "precio": 24,
+        "categoria": "postres",
+        "emoji": "🍰"
+    },
+    {
+        "nombre": "Combo\nMr.Burger",
+        "descripcion": "Burger + papas\n+ bebida",
+        "precio": 120,
+        "categoria": "combos",
+        "emoji": "🍔"
+    },
+    {
+        "nombre": "Combo\nDoble",
+        "descripcion": "2 burgers +\n2 papas + 2 bebidas",
+        "precio": 210,
+        "categoria": "combos",
+        "emoji": "🍽"
+    },
 ]
 
 
@@ -121,8 +287,12 @@ class MenuPrincipal(tk.Tk):
         # Carrito
         self.carrito = []
 
-        # Categoría actual
-        self.categoria_actual = "todos"
+        # Categoría actual (comida, bebidas, postres o combos)
+        self.categoria_actual = "comida"
+
+        # Periodo actual del menú: "desayuno" o "almuerzo",
+        # según la hora del sistema.
+        self.periodo_actual = obtener_periodo_actual()
 
         # Logo (para que no lo borre el garbage collector)
         self.logo_tk = None
@@ -130,6 +300,34 @@ class MenuPrincipal(tk.Tk):
 
         # Construir interfaz
         self.crear_interfaz()
+
+        # Revisa cada minuto si cambió el periodo del menú
+        # (por ejemplo, de desayuno a almuerzo) para actualizar
+        # los productos mostrados automáticamente.
+        self.after(60000, self._revisar_cambio_periodo)
+
+    # ========================================================
+    # PERIODO DEL MENÚ (DESAYUNO / ALMUERZO)
+    # ========================================================
+
+    def _revisar_cambio_periodo(self):
+
+        nuevo_periodo = obtener_periodo_actual()
+
+        if nuevo_periodo != self.periodo_actual:
+
+            self.periodo_actual = nuevo_periodo
+
+            self.mostrar_productos()
+
+        self.after(60000, self._revisar_cambio_periodo)
+
+    def _productos_del_periodo(self):
+
+        if self.periodo_actual == "desayuno":
+            return PRODUCTOS_DESAYUNO
+
+        return PRODUCTOS_ALMUERZO
 
     # ========================================================
     # UTILIDADES
@@ -260,14 +458,7 @@ class MenuPrincipal(tk.Tk):
         # Buscar únicamente Logo_fondoBlanco
         # ----------------------------------------------------
 
-        carpeta_base = os.path.dirname(
-            os.path.abspath(__file__)
-        )
-
-        carpeta_logo_sidebar = os.path.join(
-            carpeta_base,
-            "recursos"
-        )
+        carpeta_logo_sidebar = CARPETA_LOGO
 
         logo_sidebar_path = self._buscar_logo(
             carpeta_logo_sidebar,
@@ -367,45 +558,47 @@ class MenuPrincipal(tk.Tk):
         # MENÚ
         # ====================================================
 
+        # ====================================================
+        # MENÚ (Dashboard del cajero)
+        # ====================================================
+        # Solo se dejan las opciones de categorías de productos
+        # más "Cerrar Caja", tal como lo pidió el profesor.
+        # ====================================================
+
+        self.botones_sidebar = {}
+
         self.crear_boton_menu(
-            "⌂",
-            "Pedido Nuevo",
-            True,
-            self.pedido_nuevo
+            "🍔",
+            "Comida",
+            "comida",
+            lambda: self.filtrar_categoria("comida")
         )
 
         self.crear_boton_menu(
-            "▣",
-            "Historial de\nPedidos",
-            False,
-            self.historial
+            "🥤",
+            "Bebidas",
+            "bebidas",
+            lambda: self.filtrar_categoria("bebidas")
         )
 
         self.crear_boton_menu(
-            "♙",
-            "Clientes",
-            False,
-            self.clientes
+            "🍰",
+            "Postres",
+            "postres",
+            lambda: self.filtrar_categoria("postres")
         )
 
         self.crear_boton_menu(
-            "↗",
-            "Menú Rápido",
-            False,
-            self.menu_rapido
-        )
-
-        self.crear_boton_menu(
-            "⚙",
-            "Configuración\nde Caja",
-            False,
-            self.configuracion
+            "🍟",
+            "Combos",
+            "combos",
+            lambda: self.filtrar_categoria("combos")
         )
 
         self.crear_boton_menu(
             "⇥",
             "Cerrar Caja",
-            False,
+            None,
             self.cerrar_caja
         )
 
@@ -518,9 +711,14 @@ class MenuPrincipal(tk.Tk):
         self,
         icono,
         texto,
-        activo,
+        categoria,
         comando
     ):
+
+        activo = (
+            categoria is not None
+            and categoria == self.categoria_actual
+        )
 
         color = ROJO_CLARO if activo else ROJO
 
@@ -563,15 +761,26 @@ class MenuPrincipal(tk.Tk):
 
         def entrar(event):
 
-            if not activo:
+            es_activo = (
+                categoria is not None
+                and categoria == self.categoria_actual
+            )
+
+            if not es_activo:
                 boton.configure(bg=ROJO_OSCURO)
                 label.configure(bg=ROJO_OSCURO)
 
         def salir(event):
 
-            if not activo:
-                boton.configure(bg=ROJO)
-                label.configure(bg=ROJO)
+            es_activo = (
+                categoria is not None
+                and categoria == self.categoria_actual
+            )
+
+            color_normal = ROJO_CLARO if es_activo else ROJO
+
+            boton.configure(bg=color_normal)
+            label.configure(bg=color_normal)
 
         boton.bind("<Enter>", entrar)
         boton.bind("<Leave>", salir)
@@ -579,23 +788,67 @@ class MenuPrincipal(tk.Tk):
         label.bind("<Enter>", entrar)
         label.bind("<Leave>", salir)
 
+        # Se guarda la referencia para poder resaltar el botón
+        # activo cuando el cajero cambie de categoría.
+        if categoria is not None:
+
+            self.botones_sidebar[categoria] = (
+                boton,
+                label,
+                icono,
+                texto
+            )
+
     # ========================================================
     # PARTE CENTRAL
     # ========================================================
 
     def crear_cabecera(self):
 
-        titulo = tk.Label(
+        titulo_texto = (
+            "Menú de Desayuno"
+            if self.periodo_actual == "desayuno"
+            else "Menú de Almuerzo"
+        )
+
+        encabezado = tk.Frame(
             self.zona_central,
-            text="Nuevo Pedido",
+            bg=CREMA
+        )
+
+        encabezado.pack(
+            fill="x",
+            pady=(0, 18)
+        )
+
+        titulo = tk.Label(
+            encabezado,
+            text=titulo_texto,
             font=("Segoe UI", 28, "bold"),
             fg=TEXTO,
             bg=CREMA
         )
 
         titulo.pack(
-            anchor="w",
-            pady=(0, 18)
+            side="left"
+        )
+
+        horario_texto = (
+            "🕐  Disponible de 7:00 a 11:00"
+            if self.periodo_actual == "desayuno"
+            else "🕐  Disponible de 11:00 a 2:00"
+        )
+
+        tk.Label(
+            encabezado,
+            text=horario_texto,
+            font=("Segoe UI", 10),
+            fg=GRIS,
+            bg=CREMA
+        ).pack(
+            side="left",
+            padx=(15, 0),
+            pady=(10, 0)
         )
 
         # ----------------------------------------------------
@@ -650,56 +903,6 @@ class MenuPrincipal(tk.Tk):
             side="right",
             padx=15
         )
-
-        # ----------------------------------------------------
-        # CATEGORÍAS
-        # ----------------------------------------------------
-
-        categorias = tk.Frame(
-            self.zona_central,
-            bg=CREMA
-        )
-
-        categorias.pack(
-            fill="x",
-            pady=(0, 15)
-        )
-
-        botones = [
-            ("🍔", "todos"),
-            ("🍝", "pasta"),
-            ("🍕", "pizza"),
-            ("🍴", "ensaladas"),
-            ("⚙", "bebidas")
-        ]
-
-        self.botones_categoria = {}
-
-        for icono, categoria in botones:
-
-            es_activo = categoria == self.categoria_actual
-
-            boton = tk.Button(
-                categorias,
-                text=icono,
-                font=("Segoe UI", 16),
-                bg=NARANJA if es_activo else BLANCO,
-                fg="white" if es_activo else NARANJA,
-                activebackground="#FFE3B3",
-                relief="flat",
-                bd=0,
-                width=5,
-                height=1,
-                command=lambda c=categoria:
-                self.filtrar_categoria(c)
-            )
-
-            boton.pack(
-                side="left",
-                padx=5
-            )
-
-            self.botones_categoria[categoria] = boton
 
     # ========================================================
     # MOSTRAR PRODUCTOS
@@ -804,7 +1007,7 @@ class MenuPrincipal(tk.Tk):
 
         productos = []
 
-        for producto in PRODUCTOS:
+        for producto in self._productos_del_periodo():
 
             if (
                 self.categoria_actual != "todos"
@@ -952,13 +1155,17 @@ class MenuPrincipal(tk.Tk):
 
         self.categoria_actual = categoria
 
-        for cat, boton in self.botones_categoria.items():
+        for cat, (boton, label, icono, texto) in self.botones_sidebar.items():
 
             es_activo = cat == categoria
 
-            boton.configure(
-                bg=NARANJA if es_activo else BLANCO,
-                fg="white" if es_activo else NARANJA
+            color = ROJO_CLARO if es_activo else ROJO
+
+            boton.configure(bg=color)
+
+            label.configure(
+                bg=color,
+                font=("Segoe UI", 13, "bold" if es_activo else "normal")
             )
 
         self.dibujar_productos()
@@ -1221,65 +1428,10 @@ class MenuPrincipal(tk.Tk):
         )
 
         # ----------------------------------------------------
-        # TECLADO
-        # ----------------------------------------------------
-
-        teclado = tk.Frame(
-            self.resumen,
-            bg=BLANCO
-        )
-
-        teclado.pack(
-            fill="x",
-            padx=25,
-            pady=5
-        )
-
-        numeros = [
-            "1", "2", "3", "⌫",
-            "4", "5", "6", "−",
-            "7", "8", "9", "+"
-        ]
-
-        for i, numero in enumerate(numeros):
-
-            fila = i // 4
-            columna = i % 4
-
-            color = (
-                NARANJA
-                if numero in ["⌫", "+"]
-                else BLANCO
-            )
-
-            boton = tk.Button(
-                teclado,
-                text=numero,
-                font=("Segoe UI", 14, "bold"),
-                bg=color,
-                fg="white" if color == NARANJA else TEXTO,
-                relief="solid",
-                bd=1,
-                command=lambda n=numero:
-                self.tecla(n)
-            )
-
-            boton.grid(
-                row=fila,
-                column=columna,
-                padx=3,
-                pady=3,
-                sticky="nsew"
-            )
-
-        for i in range(4):
-            teclado.grid_columnconfigure(
-                i,
-                weight=1
-            )
-
-        # ----------------------------------------------------
         # PAGAR
+        # ----------------------------------------------------
+        # (Se eliminó la calculadora/teclado numérico: al ser
+        # un sistema automatizado, el total se calcula solo.)
         # ----------------------------------------------------
 
         self.btn_pagar = tk.Button(
@@ -1424,14 +1576,6 @@ class MenuPrincipal(tk.Tk):
         )
 
     # ========================================================
-    # TECLADO
-    # ========================================================
-
-    def tecla(self, numero):
-
-        print("Tecla:", numero)
-
-    # ========================================================
     # PAGAR
     # ========================================================
 
@@ -1482,40 +1626,8 @@ class MenuPrincipal(tk.Tk):
             self.actualizar_resumen()
 
     # ========================================================
-    # OPCIONES DEL MENÚ
+    # CERRAR CAJA
     # ========================================================
-
-    def pedido_nuevo(self):
-
-        pass
-
-    def historial(self):
-
-        messagebox.showinfo(
-            "Historial",
-            "Módulo de historial de pedidos."
-        )
-
-    def clientes(self):
-
-        messagebox.showinfo(
-            "Clientes",
-            "Módulo de clientes."
-        )
-
-    def menu_rapido(self):
-
-        messagebox.showinfo(
-            "Menú rápido",
-            "Módulo de menú rápido."
-        )
-
-    def configuracion(self):
-
-        messagebox.showinfo(
-            "Configuración",
-            "Configuración de caja."
-        )
 
     def cerrar_caja(self):
 

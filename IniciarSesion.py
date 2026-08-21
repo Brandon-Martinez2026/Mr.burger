@@ -16,13 +16,13 @@ except ImportError:
 # COLORES
 # ============================================================
 
-ROJO = "#A92718"
-ROJO_OSCURO = "#7E1D14"
+ROJO = "#C0392B"
+ROJO_OSCURO = "#7A2418"
 CREMA = "#FBF0DC"
 BLANCO = "#FFFFFF"
 GRIS = "#777777"
-BORDE = "#E5D8C4"
-TEXTO = "#292929"
+BORDE = "#D9C9A8"
+TEXTO = "#2B2118"
 FONDO_INPUT = "#FAFAFA"
 
 
@@ -118,9 +118,19 @@ class IniciarSesion(tk.Tk):
             os.path.abspath(__file__)
         )
 
+        carpeta_recursos = None
+
+        for nombre in ("Recursos", "recursos"):
+            posible = os.path.join(carpeta, nombre)
+            if os.path.isdir(posible):
+                carpeta_recursos = posible
+                break
+
+        if carpeta_recursos is None:
+            carpeta_recursos = os.path.join(carpeta, "Recursos")
+
         ruta = os.path.join(
-            carpeta,
-            "recursos",
+            carpeta_recursos,
             "Logo_fondoBlanco.png"
         )
 
@@ -232,7 +242,7 @@ class IniciarSesion(tk.Tk):
 
         panel_izquierdo = tk.Frame(
             contenedor,
-            bg=CREMA
+            bg=BLANCO
         )
 
         panel_izquierdo.grid(
@@ -247,7 +257,7 @@ class IniciarSesion(tk.Tk):
 
         panel_derecho = tk.Frame(
             contenedor,
-            bg=BLANCO
+            bg=ROJO
         )
 
         panel_derecho.grid(
@@ -262,7 +272,7 @@ class IniciarSesion(tk.Tk):
 
         login = tk.Frame(
             panel_izquierdo,
-            bg=CREMA
+            bg=BLANCO
         )
 
         login.place(
@@ -281,7 +291,7 @@ class IniciarSesion(tk.Tk):
             text="MR.BURGER",
             font=("Segoe UI", 20, "bold"),
             fg=ROJO,
-            bg=CREMA
+            bg=BLANCO
         ).pack(
             pady=(0, 18)
         )
@@ -295,7 +305,7 @@ class IniciarSesion(tk.Tk):
             text="Iniciar sesión",
             font=("Segoe UI", 34, "bold"),
             fg=TEXTO,
-            bg=CREMA
+            bg=BLANCO
         ).pack()
 
         # ====================================================
@@ -307,7 +317,7 @@ class IniciarSesion(tk.Tk):
             text="Ingresa tus datos para continuar",
             font=("Segoe UI", 12),
             fg=GRIS,
-            bg=CREMA
+            bg=BLANCO
         ).pack(
             pady=(8, 38)
         )
@@ -321,7 +331,7 @@ class IniciarSesion(tk.Tk):
             text="Usuario",
             font=("Segoe UI", 11, "bold"),
             fg=TEXTO,
-            bg=CREMA
+            bg=BLANCO
         ).pack(
             anchor="w"
         )
@@ -358,7 +368,7 @@ class IniciarSesion(tk.Tk):
             text="Contraseña",
             font=("Segoe UI", 11, "bold"),
             fg=TEXTO,
-            bg=CREMA
+            bg=BLANCO
         ).pack(
             anchor="w"
         )
@@ -462,7 +472,7 @@ class IniciarSesion(tk.Tk):
             text="SALIR",
             font=("Segoe UI", 11, "bold"),
             fg=ROJO,
-            bg=CREMA,
+            bg=BLANCO,
             activeforeground=BLANCO,
             activebackground=ROJO,
             relief="solid",
@@ -486,7 +496,7 @@ class IniciarSesion(tk.Tk):
             text="Sistema de Punto de Venta",
             font=("Segoe UI", 9),
             fg=GRIS,
-            bg=CREMA
+            bg=BLANCO
         ).pack(
             pady=(26, 0)
         )
@@ -537,7 +547,7 @@ class IniciarSesion(tk.Tk):
             logo_label = tk.Label(
                 panel_derecho,
                 image=self.logo_tk,
-                bg=BLANCO,
+                bg=ROJO,
                 bd=0
             )
 
@@ -557,8 +567,8 @@ class IniciarSesion(tk.Tk):
                 panel_derecho,
                 text="MR.BURGER",
                 font=("Segoe UI", 65, "bold"),
-                fg=ROJO,
-                bg=BLANCO
+                fg=BLANCO,
+                bg=ROJO
             ).place(
                 relx=0.5,
                 rely=0.44,
@@ -573,8 +583,8 @@ class IniciarSesion(tk.Tk):
             panel_derecho,
             text="DISFRUTA CADA MOMENTO",
             font=("Segoe UI", 13, "bold"),
-            fg=ROJO,
-            bg=BLANCO
+            fg=BLANCO,
+            bg=ROJO
         ).place(
             relx=0.5,
             rely=0.80,
@@ -587,7 +597,7 @@ class IniciarSesion(tk.Tk):
 
         tk.Frame(
             panel_derecho,
-            bg=ROJO,
+            bg=BLANCO,
             height=4,
             width=200
         ).place(
