@@ -29,9 +29,22 @@ FONDO_INPUT = "#FAFAFA"
 # ============================================================
 # CREDENCIALES TEMPORALES
 # ============================================================
+# Cada usuario tiene una contraseña y un rol asociado.
+# Según el rol, IniciarSesion.py decide a qué pantalla
+# redirigir: "administrador" -> MenuAdministrador.py
+#            "cajero"        -> MenuPrincipal.py
+# ============================================================
 
-USUARIO_TEMPORAL = "admin"
-CONTRASENA_TEMPORAL = "admin"
+USUARIOS = {
+    "admin": {
+        "password": "admin",
+        "rol": "administrador"
+    },
+    "cajero": {
+        "password": "cajero123",
+        "rol": "cajero"
+    }
+}
 
 
 # ============================================================
@@ -757,13 +770,21 @@ class IniciarSesion(tk.Tk):
         # COMPROBAR CREDENCIALES
         # ====================================================
 
+        datos_usuario = USUARIOS.get(usuario)
+
         if (
-            usuario == USUARIO_TEMPORAL
+            datos_usuario is not None
             and
-            password == CONTRASENA_TEMPORAL
+            password == datos_usuario["password"]
         ):
 
-            self.abrir_menu_principal()
+            if datos_usuario["rol"] == "administrador":
+
+                self.abrir_menu_administrador()
+
+            else:
+
+                self.abrir_menu_principal()
 
         else:
 
@@ -798,10 +819,10 @@ class IniciarSesion(tk.Tk):
             self.destroy()
 
     # ========================================================
-    # ABRIR MENÚ PRINCIPAL
+    # ABRIR VENTANA (uso interno / compartido)
     # ========================================================
 
-    def abrir_menu_principal(self):
+    def _abrir_ventana(self, nombre_archivo, nombre_amigable):
 
         carpeta = os.path.dirname(
             os.path.abspath(__file__)
@@ -809,7 +830,7 @@ class IniciarSesion(tk.Tk):
 
         archivo_menu = os.path.join(
             carpeta,
-            "MenuPrincipal.py"
+            nombre_archivo
         )
 
         # ====================================================
@@ -820,14 +841,14 @@ class IniciarSesion(tk.Tk):
 
             messagebox.showerror(
                 "Error",
-                "No se encontró MenuPrincipal.py.",
+                f"No se encontró {nombre_archivo}.",
                 parent=self
             )
 
             return
 
         # ====================================================
-        # ABRIR MENÚ
+        # ABRIR VENTANA
         # ====================================================
 
         try:
@@ -845,9 +866,31 @@ class IniciarSesion(tk.Tk):
 
             messagebox.showerror(
                 "Error",
-                f"No se pudo abrir el menú principal:\n{e}",
+                f"No se pudo abrir {nombre_amigable}:\n{e}",
                 parent=self
             )
+
+    # ========================================================
+    # ABRIR MENÚ PRINCIPAL (CAJERO)
+    # ========================================================
+
+    def abrir_menu_principal(self):
+
+        self._abrir_ventana(
+            "MenuPrincipal.py",
+            "el menú principal"
+        )
+
+    # ========================================================
+    # ABRIR MENÚ ADMINISTRADOR
+    # ========================================================
+
+    def abrir_menu_administrador(self):
+
+        self._abrir_ventana(
+            "MenuAdministrador.py",
+            "el menú de administrador"
+        )
 
 
 # ============================================================
