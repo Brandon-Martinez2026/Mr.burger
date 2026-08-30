@@ -17,10 +17,7 @@ from punto_venta import catalogo
 from punto_venta.ventana_pago import VentanaMetodoPago
 
 import datos_ventas
-<<<<<<< HEAD
 from basedatos.conexion import ErrorBaseDatos
-=======
->>>>>>> 3af9e03b097cc6b36f9ba114fa6774e55e00e44f
 
 
 class PanelCarrito(tk.Frame):
@@ -119,15 +116,9 @@ class PanelCarrito(tk.Frame):
         # NOTAS
         # ----------------------------------------------------
 
-<<<<<<< HEAD
         self.entrada_notas = tk.Text(self, height=3, font=("Segoe UI", 10), fg=GRIS, bd=1, relief="solid")
         self.entrada_notas.insert("1.0", "Notas")
         self.entrada_notas.pack(fill="x", padx=25, pady=5)
-=======
-        notas = tk.Text(self, height=3, font=("Segoe UI", 10), fg=GRIS, bd=1, relief="solid")
-        notas.insert("1.0", "Notas")
-        notas.pack(fill="x", padx=25, pady=5)
->>>>>>> 3af9e03b097cc6b36f9ba114fa6774e55e00e44f
 
         # ----------------------------------------------------
         # BOTONES
@@ -258,12 +249,9 @@ class PanelCarrito(tk.Frame):
             "precio": producto["precio"],
             "cantidad": 1
         })
-<<<<<<< HEAD
         # Nota: conservamos "id" (id_producto) en cada línea del
         # carrito porque es lo que se usa para registrar el pedido
         # de verdad en la base de datos (detalle_pedido).
-=======
->>>>>>> 3af9e03b097cc6b36f9ba114fa6774e55e00e44f
 
         self.actualizar_resumen()
 
@@ -332,7 +320,6 @@ class PanelCarrito(tk.Frame):
 
         total = sum(item["precio"] * item["cantidad"] for item in self.carrito)
 
-<<<<<<< HEAD
         notas_texto = self.entrada_notas.get("1.0", "end").strip()
 
         if notas_texto == "Notas":
@@ -364,44 +351,16 @@ class PanelCarrito(tk.Frame):
                     "precio": item["precio"],
                     "cantidad": item["cantidad"],
                 }
-=======
-        # ----------------------------------------------------
-        # DESCONTAR INVENTARIO (solo durante esta sesión; no se
-        # guarda en ningún archivo. El backend real deberá
-        # actualizar el stock en la base de datos).
-        # ----------------------------------------------------
-
-        for item in self.carrito:
-            catalogo.descontar_stock(item.get("id"), item["cantidad"])
-
-        # ----------------------------------------------------
-        # REGISTRAR LA VENTA
-        # ----------------------------------------------------
-
-        venta = {
-            "fecha": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "cajero": self.controlador.cajero_actual,
-            "tipo_pedido": self.tipo_pedido,
-            "mesa": self.numero_mesa if self.tipo_pedido == "mesa" else None,
-            "metodo_pago": metodo,
-            "detalle_pago": detalle,
-            "items": [
-                {"nombre": item["nombre"], "precio": item["precio"], "cantidad": item["cantidad"]}
->>>>>>> 3af9e03b097cc6b36f9ba114fa6774e55e00e44f
                 for item in self.carrito
             ],
             "total": round(total, 2)
         }
 
-<<<<<<< HEAD
         try:
             datos_ventas.guardar_venta(venta)
         except ErrorBaseDatos as error:
             messagebox.showerror("No se pudo registrar la venta", str(error))
             return
-=======
-        datos_ventas.guardar_venta(venta)
->>>>>>> 3af9e03b097cc6b36f9ba114fa6774e55e00e44f
 
         # ----------------------------------------------------
         # MENSAJE DE CONFIRMACIÓN
@@ -414,11 +373,7 @@ class PanelCarrito(tk.Frame):
         }
 
         mensaje = (
-<<<<<<< HEAD
             f"Venta registrada correctamente en la base de datos.\n\n"
-=======
-            f"Venta registrada correctamente.\n\n"
->>>>>>> 3af9e03b097cc6b36f9ba114fa6774e55e00e44f
             f"Total: Q{total:.2f}\n"
             f"Método de pago: {nombres_metodo.get(metodo, metodo)}\n"
         )
@@ -439,7 +394,6 @@ class PanelCarrito(tk.Frame):
         messagebox.showinfo("Pago realizado", mensaje)
 
         self.carrito.clear()
-<<<<<<< HEAD
         self.actualizar_resumen()
 
         self.entrada_notas.delete("1.0", "end")
@@ -450,11 +404,6 @@ class PanelCarrito(tk.Frame):
         if hasattr(self.controlador, "vista_productos"):
             self.controlador.vista_productos.dibujar_productos()
 
-=======
-
-        self.actualizar_resumen()
-
->>>>>>> 3af9e03b097cc6b36f9ba114fa6774e55e00e44f
     # ========================================================
     # CANCELAR
     # ========================================================

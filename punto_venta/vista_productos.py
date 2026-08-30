@@ -104,11 +104,7 @@ class VistaProductos(tk.Frame):
         ).pack(side="left", pady=15)
 
         entrada = tk.Entry(cliente, font=("Segoe UI", 11), bd=0, bg="#FFFDF9")
-<<<<<<< HEAD
         entrada.insert(0, " 🔍  Teléfono (opcional)")
-=======
-        entrada.insert(0, " 🔍  E-mail/teléfono")
->>>>>>> 3af9e03b097cc6b36f9ba114fa6774e55e00e44f
         entrada.pack(side="left", fill="x", expand=True, padx=20, pady=10)
 
     # ========================================================
