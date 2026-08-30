@@ -11,6 +11,13 @@ except ImportError:
     print("pip install pillow")
     sys.exit(1)
 
+# Permite importar el paquete local "basedatos" sin importar
+# desde dónde se ejecute este archivo.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from basedatos.repositorio_usuarios import autenticar
+from basedatos.conexion import ErrorBaseDatos
+
 
 # ============================================================
 # COLORES
@@ -27,11 +34,16 @@ FONDO_INPUT = "#FAFAFA"
 
 
 # ============================================================
-# CREDENCIALES TEMPORALES
+# AUTENTICACIÓN
 # ============================================================
-
-USUARIO_TEMPORAL = "admin"
-CONTRASENA_TEMPORAL = "admin"
+# Mr.Burger se maneja únicamente con credenciales: no se pide ni
+# se guarda correo electrónico en ningún punto del sistema. Cada
+# intento de inicio de sesión se valida contra la tabla
+# "usuarios" de mr_burguer_db (usuario + contraseña con hash).
+# Según el rol devuelto, IniciarSesion.py decide a qué pantalla
+# redirigir: "administrador" -> MenuAdministrador.py
+#            cualquier otro  -> MenuPrincipal.py (cajero)
+# ============================================================
 
 
 # ============================================================
@@ -76,6 +88,10 @@ class IniciarSesion(tk.Tk):
         self.password_var = tk.StringVar()
 
         self.mostrar_password = False
+
+        # Datos del usuario autenticado (id_usuario, nombre_completo,
+        # usuario, rol), llenados por autenticar() al iniciar sesión.
+        self.usuario_autenticado = None
 
         self.logo_original = None
         self.logo_tk = None
@@ -754,16 +770,37 @@ class IniciarSesion(tk.Tk):
             return
 
         # ====================================================
-        # COMPROBAR CREDENCIALES
+        # COMPROBAR CREDENCIALES CONTRA LA BASE DE DATOS
         # ====================================================
 
-        if (
-            usuario == USUARIO_TEMPORAL
-            and
-            password == CONTRASENA_TEMPORAL
-        ):
+        try:
 
-            self.abrir_menu_principal()
+            datos_usuario = autenticar(usuario, password)
+
+        except ErrorBaseDatos as error:
+
+            messagebox.showerror(
+                "Mr.Burger",
+                str(error),
+                parent=self
+            )
+
+            return
+
+        if datos_usuario is not None:
+
+            # Guardamos la sesión autenticada para pasarla a la
+            # siguiente pantalla (id_usuario y nombre reales de la
+            # tabla "usuarios").
+            self.usuario_autenticado = datos_usuario
+
+            if datos_usuario["rol"] == "administrador":
+
+                self.abrir_menu_administrador()
+
+            else:
+
+                self.abrir_menu_principal()
 
         else:
 
@@ -798,10 +835,10 @@ class IniciarSesion(tk.Tk):
             self.destroy()
 
     # ========================================================
-    # ABRIR MENÚ PRINCIPAL
+    # ABRIR VENTANA (uso interno / compartido)
     # ========================================================
 
-    def abrir_menu_principal(self):
+    def _abrir_ventana(self, nombre_archivo, nombre_amigable):
 
         carpeta = os.path.dirname(
             os.path.abspath(__file__)
@@ -809,7 +846,7 @@ class IniciarSesion(tk.Tk):
 
         archivo_menu = os.path.join(
             carpeta,
-            "MenuPrincipal.py"
+            nombre_archivo
         )
 
         # ====================================================
@@ -820,14 +857,14 @@ class IniciarSesion(tk.Tk):
 
             messagebox.showerror(
                 "Error",
-                "No se encontró MenuPrincipal.py.",
+                f"No se encontró {nombre_archivo}.",
                 parent=self
             )
 
             return
 
         # ====================================================
-        # ABRIR MENÚ
+        # ABRIR VENTANA
         # ====================================================
 
         try:
@@ -845,9 +882,31 @@ class IniciarSesion(tk.Tk):
 
             messagebox.showerror(
                 "Error",
-                f"No se pudo abrir el menú principal:\n{e}",
+                f"No se pudo abrir {nombre_amigable}:\n{e}",
                 parent=self
             )
+
+    # ========================================================
+    # ABRIR MENÚ PRINCIPAL (CAJERO)
+    # ========================================================
+
+    def abrir_menu_principal(self):
+
+        self._abrir_ventana(
+            "MenuPrincipal.py",
+            "el menú principal"
+        )
+
+    # ========================================================
+    # ABRIR MENÚ ADMINISTRADOR
+    # ========================================================
+
+    def abrir_menu_administrador(self):
+
+        self._abrir_ventana(
+            "MenuAdministrador.py",
+            "el menú de administrador"
+        )
 
 
 # ============================================================
