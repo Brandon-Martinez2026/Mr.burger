@@ -26,6 +26,7 @@ from punto_venta.app import MenuPrincipal
 
 if __name__ == "__main__":
 
+<<<<<<< HEAD
     # IniciarSesion.py abre esta ventana pasando la sesión real
     # del cajero autenticado: id_usuario y nombre_completo, en
     # ese orden, como argumentos de línea de comandos. Si se
@@ -35,4 +36,7 @@ if __name__ == "__main__":
     nombre_cajero = sys.argv[2] if len(sys.argv) > 2 else None
 
     app = MenuPrincipal(id_usuario=id_usuario, nombre_cajero=nombre_cajero)
+=======
+    app = MenuPrincipal()
+>>>>>>> 3af9e03b097cc6b36f9ba114fa6774e55e00e44f
     app.mainloop()

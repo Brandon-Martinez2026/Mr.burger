@@ -31,6 +31,7 @@ from panel_admin.app import MenuAdministrador
 
 if __name__ == "__main__":
 
+<<<<<<< HEAD
     # IniciarSesion.py abre esta ventana pasando la sesión real
     # del administrador autenticado: id_usuario y nombre_completo,
     # en ese orden, como argumentos de línea de comandos. Si se
@@ -40,4 +41,7 @@ if __name__ == "__main__":
     nombre_admin = sys.argv[2] if len(sys.argv) > 2 else None
 
     app = MenuAdministrador(id_usuario=id_usuario, nombre_admin=nombre_admin)
+=======
+    app = MenuAdministrador()
+>>>>>>> 3af9e03b097cc6b36f9ba114fa6774e55e00e44f
     app.mainloop()

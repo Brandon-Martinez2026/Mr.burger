@@ -1,3 +1,17 @@
+"""
+app.py (punto_venta)
+------------------------------------------------------------
+Ventana principal del Punto de Venta (antes todo esto vivía en
+un único archivo MenuPrincipal.py). Esta clase solo se encarga
+de la ventana, el sidebar y de unir las piezas:
+
+    - punto_venta/catalogo.py        -> datos de productos
+    - punto_venta/vista_productos.py -> cuadrícula de productos
+    - punto_venta/panel_carrito.py   -> carrito y cobro
+    - punto_venta/ventana_pago.py    -> ventana de método de pago
+------------------------------------------------------------
+"""
+
 import os
 import sys
 

@@ -44,6 +44,25 @@ FONDO_INPUT = "#FAFAFA"
 # redirigir: "administrador" -> MenuAdministrador.py
 #            cualquier otro  -> MenuPrincipal.py (cajero)
 # ============================================================
+<<<<<<< HEAD
+=======
+# Cada usuario tiene una contraseña y un rol asociado.
+# Según el rol, IniciarSesion.py decide a qué pantalla
+# redirigir: "administrador" -> MenuAdministrador.py
+#            "cajero"        -> MenuPrincipal.py
+# ============================================================
+
+USUARIOS = {
+    "admin": {
+        "password": "admin",
+        "rol": "administrador"
+    },
+    "cajero": {
+        "password": "cajero123",
+        "rol": "cajero"
+    }
+}
+>>>>>>> 3af9e03b097cc6b36f9ba114fa6774e55e00e44f
 
 
 # ============================================================
@@ -773,6 +792,7 @@ class IniciarSesion(tk.Tk):
         # COMPROBAR CREDENCIALES CONTRA LA BASE DE DATOS
         # ====================================================
 
+<<<<<<< HEAD
         try:
 
             datos_usuario = autenticar(usuario, password)
@@ -794,6 +814,16 @@ class IniciarSesion(tk.Tk):
             # tabla "usuarios").
             self.usuario_autenticado = datos_usuario
 
+=======
+        datos_usuario = USUARIOS.get(usuario)
+
+        if (
+            datos_usuario is not None
+            and
+            password == datos_usuario["password"]
+        ):
+
+>>>>>>> 3af9e03b097cc6b36f9ba114fa6774e55e00e44f
             if datos_usuario["rol"] == "administrador":
 
                 self.abrir_menu_administrador()
