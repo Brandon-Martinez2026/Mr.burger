@@ -32,7 +32,7 @@ from estilos import (
     ROJO, ROJO_CLARO, ROJO_OSCURO, CREMA,
     FILTRO_REESCALADO, resolver_carpeta_recursos, buscar_logo
 )
-from panel_admin.datos_admin import RepositorioProductos
+from basedatos.repositorio_productos import RepositorioProductos
 from panel_admin.vista_inventario import VistaInventario
 from panel_admin.vista_categorias import VistaCategorias
 from panel_admin.vista_cajeros import VistaCajeros
