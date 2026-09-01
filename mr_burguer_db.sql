@@ -2,10 +2,6 @@ DROP DATABASE IF EXISTS mr_burguer_db;
 CREATE DATABASE mr_burguer_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE mr_burguer_db;
 
--- =========================================================
--- TABLAS
--- =========================================================
-
 -- Roles
 CREATE TABLE roles (
     id_rol      INT AUTO_INCREMENT PRIMARY KEY,
@@ -26,11 +22,11 @@ CREATE TABLE usuarios (
 
 -- Categorias
 CREATE TABLE categorias (
-    id_categoria    INT AUTO_INCREMENT PRIMARY KEY,
+    id_categoria     INT AUTO_INCREMENT PRIMARY KEY,
     nombre_categoria VARCHAR(50) NOT NULL UNIQUE
 );
 
--- Productos (platillos y combos)
+-- Productos (platillos y combps)
 CREATE TABLE productos (
     id_producto         INT AUTO_INCREMENT PRIMARY KEY,
     nombre_producto     VARCHAR(100) NOT NULL,
@@ -48,10 +44,10 @@ CREATE TABLE productos (
 
 -- Detalle de combos
 CREATE TABLE combo_detalle (
-    id_combo_detalle    INT AUTO_INCREMENT PRIMARY KEY,
+    id_combo_detalle     INT AUTO_INCREMENT PRIMARY KEY,
     id_combo             INT NOT NULL,
     id_producto_incluido INT NOT NULL,
-    cantidad              INT NOT NULL DEFAULT 1,
+    cantidad             INT NOT NULL DEFAULT 1,
     FOREIGN KEY (id_combo) REFERENCES productos(id_producto) ON DELETE CASCADE,
     FOREIGN KEY (id_producto_incluido) REFERENCES productos(id_producto)
 );
@@ -60,18 +56,18 @@ CREATE TABLE combo_detalle (
 CREATE TABLE inventario (
     id_insumo            INT AUTO_INCREMENT PRIMARY KEY,
     nombre_insumo        VARCHAR(100) NOT NULL,
-    unidad_medida         VARCHAR(20) NOT NULL,
-    cantidad_actual       DECIMAL(10,2) NOT NULL DEFAULT 0,
-    cantidad_minima       DECIMAL(10,2) NOT NULL DEFAULT 0,
-    fecha_actualizacion   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    unidad_medida        VARCHAR(20) NOT NULL,
+    cantidad_actual      DECIMAL(10,2) NOT NULL DEFAULT 0,
+    cantidad_minima      DECIMAL(10,2) NOT NULL DEFAULT 0,
+    fecha_actualizacion  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- Receta de insumos por producto
 CREATE TABLE producto_insumo (
     id_producto_insumo INT AUTO_INCREMENT PRIMARY KEY,
-    id_producto         INT NOT NULL,
-    id_insumo           INT NOT NULL,
-    cantidad_requerida  DECIMAL(10,2) NOT NULL,
+    id_producto        INT NOT NULL,
+    id_insumo          INT NOT NULL,
+    cantidad_requerida DECIMAL(10,2) NOT NULL,
     FOREIGN KEY (id_producto) REFERENCES productos(id_producto) ON DELETE CASCADE,
     FOREIGN KEY (id_insumo) REFERENCES inventario(id_insumo)
 );
@@ -91,7 +87,7 @@ CREATE TABLE pedidos (
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
 );
 
--- Detalle de pedido
+-- Detalle de pedido 	
 CREATE TABLE detalle_pedido (
     id_detalle       INT AUTO_INCREMENT PRIMARY KEY,
     id_pedido        INT NOT NULL,
@@ -103,7 +99,7 @@ CREATE TABLE detalle_pedido (
     FOREIGN KEY (id_producto) REFERENCES productos(id_producto)
 );
 
--- Pagos de un pedido (permite pago mixto: varias filas, distintos metodos)
+-- Pagos de un pedido 
 CREATE TABLE pedido_pagos (
     id_pago      INT AUTO_INCREMENT PRIMARY KEY,
     id_pedido    INT NOT NULL,
@@ -132,9 +128,6 @@ CREATE INDEX idx_detalle_pedido_id_pedido ON detalle_pedido(id_pedido);
 CREATE INDEX idx_detalle_pedido_id_producto ON detalle_pedido(id_producto);
 CREATE INDEX idx_pedido_pagos_id_pedido ON pedido_pagos(id_pedido);
 
--- =========================================================
--- VISTAS
--- =========================================================
 
 CREATE VIEW vista_menu_disponible AS
 SELECT p.*
@@ -186,9 +179,6 @@ FROM pedido_pagos pp
 JOIN pedidos pe ON pe.id_pedido = pp.id_pedido
 GROUP BY pp.id_pedido, pe.estado, pe.total;
 
--- =========================================================
--- TRIGGERS
--- =========================================================
 
 DELIMITER $$
 
@@ -234,10 +224,6 @@ BEGIN
 END$$
 
 DELIMITER ;
-
--- =========================================================
--- PROCEDIMIENTOS ALMACENADOS
--- =========================================================
 
 DELIMITER $$
 
@@ -364,7 +350,7 @@ BEGIN
         monto_recibido = v_total_pagado
     WHERE id_pedido = p_id_pedido;
 END$$
-
+#pollo
 CREATE PROCEDURE sp_actualizar_rol_usuario(
     IN p_id_usuario INT,
     IN p_nuevo_rol   ENUM('administrador','usuario','inhabilitado')
@@ -376,3 +362,192 @@ BEGIN
 END$$
 
 DELIMITER ;
+
+-- =========================================================
+-- INSERCIÓN DE MENÚ MR. BURGER
+-- Basado en el documento: Menu_MrBurger
+-- Incluye: categorías, productos individuales, combos con su
+-- detalle (productos que incluye cada combo) e inventario con
+-- stock inicial de 350 unidades por cada producto individual.
+-- =========================================================
+
+USE mr_burguer_db;
+
+-- =========================================================
+-- 1) CATEGORÍAS
+-- =========================================================
+INSERT INTO categorias (nombre_categoria) VALUES
+('Hamburguesas'),
+('Extras y Acompañamientos'),
+('Bebidas'),
+('Desayunos'),
+('Combos Pareja'),
+('Combos Individuales'),
+('Combos Familiares');
+
+-- =========================================================
+-- 2) PRODUCTOS INDIVIDUALES
+-- =========================================================
+
+-- 2.1 Hamburguesas
+INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_producto) VALUES
+('Hamburguesa Clásica',    'Carne, queso, lechuga, tomate, cebolla',            35.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Hamburguesas'), 'platillo'),
+('Hamburguesa Doble Carne','Doble carne, doble queso, vegetales',               48.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Hamburguesas'), 'platillo'),
+('Queso Burguesa',         'Carne, doble queso, salsa especial',                40.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Hamburguesas'), 'platillo'),
+('Hamburguesa BBQ',        'Carne, queso, tocino, aro de cebolla, salsa BBQ',   45.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Hamburguesas'), 'platillo'),
+('Hamburguesa Hawaiana',   'Carne, queso, piña asada, tocino',                  42.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Hamburguesas'), 'platillo'),
+('Hamburguesa Vegetariana','Base de vegetales/legumbres, queso, vegetales',     38.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Hamburguesas'), 'platillo'),
+('Chicken Burger',         'Pechuga de pollo empanizada, lechuga, mayonesa',    40.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Hamburguesas'), 'platillo'),
+-- Producto usado únicamente como componente del "Combo Infantil"; no aparece con precio
+-- individual en el menú, se agrega para poder registrarlo en combo_detalle.
+('Hamburguesa Pequeña',    'Versión pequeña de hamburguesa, incluida en Combo Infantil', 20.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Hamburguesas'), 'platillo');
+
+-- 2.2 Extras y acompañamientos
+INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_producto) VALUES
+('Papas Fritas (individual)',      'Porción mediana',                          15.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Extras y Acompañamientos'), 'extra'),
+('Papas Fritas (grande)',          'Porción grande',                           22.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Extras y Acompañamientos'), 'extra'),
+('Papas con queso y tocino',       'Papas bañadas en queso cheddar y tocino',  28.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Extras y Acompañamientos'), 'extra'),
+('Aros de cebolla',                'Porción mediana',                          18.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Extras y Acompañamientos'), 'extra'),
+('Galletas',                       NULL,                                        15.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Extras y Acompañamientos'), 'extra'),
+('Nuggets de pollo (6 pzas)',      'Con salsa a elección',                     20.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Extras y Acompañamientos'), 'extra'),
+-- Componente exclusivo del "Combo Infantil" (3 pzas), sin precio individual en el menú.
+('Nuggets de pollo (3 pzas)',      'Con salsa a elección, incluido en Combo Infantil', 12.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Extras y Acompañamientos'), 'extra');
+
+-- 2.3 Bebidas
+INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_producto) VALUES
+('Gaseosa (12 oz)',              'Coca-Cola, Fanta, Sprite, etc.', 10.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Bebidas'), 'bebida'),
+('Gaseosa (grande)',             '22 oz',                          15.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Bebidas'), 'bebida'),
+('Limonada / Refresco natural',  NULL,                             14.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Bebidas'), 'bebida'),
+('Malteada',                     'Vainilla, chocolate o fresa',    22.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Bebidas'), 'bebida'),
+('Café con leche',               NULL,                             10.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Bebidas'), 'bebida'),
+('Café',                         NULL,                             8.00,  (SELECT id_categoria FROM categorias WHERE nombre_categoria='Bebidas'), 'bebida'),
+('Agua pura',                    NULL,                             8.00,  (SELECT id_categoria FROM categorias WHERE nombre_categoria='Bebidas'), 'bebida'),
+-- Componente exclusivo del "Combo Infantil", sin precio individual en el menú.
+('Jugo',                         'Incluido en Combo Infantil',     10.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Bebidas'), 'bebida');
+
+-- 2.4 Desayunos (con restricción de horario 06:00 - 11:00)
+INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_producto, restringido_horario, hora_inicio, hora_fin) VALUES
+('Desayuno Mr. Burger',        'Huevos, tocino, pan, café',                                              35.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Desayunos'), 'platillo', TRUE, '06:00:00', '11:00:00'),
+('Bagel con queso crema',      NULL,                                                                      25.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Desayunos'), 'platillo', TRUE, '06:00:00', '11:00:00'),
+('Desayuno Chapín',            'Huevos al gusto, frijoles volteados, plátanos fritos, crema y queso fresco', 38.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Desayunos'), 'platillo', TRUE, '06:00:00', '11:00:00'),
+('Pan queque',                 '3 pancakes esponjosos acompañados de mantequilla y miel maple',           30.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Desayunos'), 'platillo', TRUE, '06:00:00', '11:00:00'),
+('Sándwich de Huevos y Tocino','Pan brioche con huevo frito, queso cheddar y tocino crocante',            28.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Desayunos'), 'platillo', TRUE, '06:00:00', '11:00:00'),
+('Waffle Mr. Burger',          'Waffle crujiente acompañado de tiras de pollo empanizado y miel maple',  35.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Desayunos'), 'platillo', TRUE, '06:00:00', '11:00:00'),
+('Omelette Supremo',           'Omelette de 3 huevos relleno de jamón, queso, pimientos y cebolla',       36.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Desayunos'), 'platillo', TRUE, '06:00:00', '11:00:00');
+
+-- =========================================================
+-- 3) COMBOS (productos tipo 'combo')
+-- =========================================================
+
+-- 3.1 Combos para pareja
+INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_producto) VALUES
+('Combo Pareja Clásico', '2 Hamburguesas Clásicas + 1 Papas grande + 2 Gaseosas',            95.00,  (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Pareja'), 'combo'),
+('Combo Pareja BBQ',     '2 Hamburguesas BBQ + 1 Aros de cebolla + 2 Gaseosas',              110.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Pareja'), 'combo'),
+('Combo Pareja Mixto',   '1 Hamburguesa Clásica + 1 Chicken Burger + Papas grande + 2 Gaseosas', 100.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Pareja'), 'combo');
+
+-- 3.2 Combos individuales
+INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_producto) VALUES
+('Combo Clásico',      'Hamburguesa Clásica + Papas individual + Gaseosa',        55.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Individuales'), 'combo'),
+('Combo Queso Burguesa','Queso Burguesa + Papas individual + Gaseosa',            58.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Individuales'), 'combo'),
+('Combo Doble Carne',  'Hamburguesa Doble Carne + Papas grande + Gaseosa',        68.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Individuales'), 'combo'),
+('Combo Chicken',      'Chicken Burger + Papas individual + Gaseosa',             58.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Individuales'), 'combo'),
+('Combo Infantil',     'Hamburguesa pequeña + Nuggets (3 pzas) + Jugo',           40.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Individuales'), 'combo');
+
+-- 3.3 Combos familiares (4-5 personas)
+INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_producto) VALUES
+('Combo Familiar Clásico', '4 Hamburguesas Clásicas + 2 Papas grandes + 4 Gaseosas',                          175.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Familiares'), 'combo'),
+('Combo Familiar BBQ',     '4 Hamburguesas BBQ + 2 Papas grandes + Aros de cebolla + 4 Gaseosas',              210.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Familiares'), 'combo'),
+-- "5 Hamburguesas (mixtas a elección)": se registra como 5 Hamburguesas Clásicas por defecto;
+-- el sistema puede permitir sustituir el tipo de hamburguesa al momento de la venta.
+('Combo Fiesta Mr. Burger','5 Hamburguesas (mixtas a elección) + 2 Papas grandes + 6 Nuggets + 5 Gaseosas',   260.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Familiares'), 'combo');
+
+-- =========================================================
+-- 4) DETALLE DE COMBOS (productos que incluye cada combo)
+-- =========================================================
+
+-- Combo Pareja Clásico
+INSERT INTO combo_detalle (id_combo, id_producto_incluido, cantidad) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Pareja Clásico'), (SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Clásica'), 2),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Pareja Clásico'), (SELECT id_producto FROM productos WHERE nombre_producto='Papas Fritas (grande)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Pareja Clásico'), (SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'), 2);
+
+-- Combo Pareja BBQ
+INSERT INTO combo_detalle (id_combo, id_producto_incluido, cantidad) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Pareja BBQ'), (SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa BBQ'), 2),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Pareja BBQ'), (SELECT id_producto FROM productos WHERE nombre_producto='Aros de cebolla'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Pareja BBQ'), (SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'), 2);
+
+-- Combo Pareja Mixto
+INSERT INTO combo_detalle (id_combo, id_producto_incluido, cantidad) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Pareja Mixto'), (SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Clásica'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Pareja Mixto'), (SELECT id_producto FROM productos WHERE nombre_producto='Chicken Burger'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Pareja Mixto'), (SELECT id_producto FROM productos WHERE nombre_producto='Papas Fritas (grande)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Pareja Mixto'), (SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'), 2);
+
+-- Combo Clásico
+INSERT INTO combo_detalle (id_combo, id_producto_incluido, cantidad) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Clásico'), (SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Clásica'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Clásico'), (SELECT id_producto FROM productos WHERE nombre_producto='Papas Fritas (individual)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Clásico'), (SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'), 1);
+
+-- Combo Queso Burguesa
+INSERT INTO combo_detalle (id_combo, id_producto_incluido, cantidad) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Queso Burguesa'), (SELECT id_producto FROM productos WHERE nombre_producto='Queso Burguesa'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Queso Burguesa'), (SELECT id_producto FROM productos WHERE nombre_producto='Papas Fritas (individual)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Queso Burguesa'), (SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'), 1);
+
+-- Combo Doble Carne
+INSERT INTO combo_detalle (id_combo, id_producto_incluido, cantidad) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Doble Carne'), (SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Doble Carne'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Doble Carne'), (SELECT id_producto FROM productos WHERE nombre_producto='Papas Fritas (grande)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Doble Carne'), (SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'), 1);
+
+-- Combo Chicken
+INSERT INTO combo_detalle (id_combo, id_producto_incluido, cantidad) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Chicken'), (SELECT id_producto FROM productos WHERE nombre_producto='Chicken Burger'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Chicken'), (SELECT id_producto FROM productos WHERE nombre_producto='Papas Fritas (individual)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Chicken'), (SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'), 1);
+
+-- Combo Infantil
+INSERT INTO combo_detalle (id_combo, id_producto_incluido, cantidad) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Infantil'), (SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Pequeña'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Infantil'), (SELECT id_producto FROM productos WHERE nombre_producto='Nuggets de pollo (3 pzas)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Infantil'), (SELECT id_producto FROM productos WHERE nombre_producto='Jugo'), 1);
+
+-- Combo Familiar Clásico
+INSERT INTO combo_detalle (id_combo, id_producto_incluido, cantidad) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Familiar Clásico'), (SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Clásica'), 4),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Familiar Clásico'), (SELECT id_producto FROM productos WHERE nombre_producto='Papas Fritas (grande)'), 2),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Familiar Clásico'), (SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'), 4);
+
+-- Combo Familiar BBQ
+INSERT INTO combo_detalle (id_combo, id_producto_incluido, cantidad) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Familiar BBQ'), (SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa BBQ'), 4),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Familiar BBQ'), (SELECT id_producto FROM productos WHERE nombre_producto='Papas Fritas (grande)'), 2),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Familiar BBQ'), (SELECT id_producto FROM productos WHERE nombre_producto='Aros de cebolla'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Familiar BBQ'), (SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'), 4);
+
+-- Combo Fiesta Mr. Burger (hamburguesas mixtas -> se listan 5 Hamburguesas Clásicas por defecto)
+INSERT INTO combo_detalle (id_combo, id_producto_incluido, cantidad) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Fiesta Mr. Burger'), (SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Clásica'), 5),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Fiesta Mr. Burger'), (SELECT id_producto FROM productos WHERE nombre_producto='Papas Fritas (grande)'), 2),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Fiesta Mr. Burger'), (SELECT id_producto FROM productos WHERE nombre_producto='Nuggets de pollo (6 pzas)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Combo Fiesta Mr. Burger'), (SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'), 5);
+
+-- =========================================================
+-- 5) INVENTARIO: stock de 350 por cada producto individual
+--    (no se crea insumo para los combos, ya que su stock
+--    depende de los insumos de los productos que los componen)
+-- =========================================================
+
+INSERT INTO inventario (nombre_insumo, unidad_medida, cantidad_actual, cantidad_minima)
+SELECT nombre_producto, 'unidad', 350, 20
+FROM productos
+WHERE tipo_producto <> 'combo';
+
+-- Vincula cada producto individual con su propio insumo (1 unidad de insumo = 1 unidad de producto)
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida)
+SELECT p.id_producto, i.id_insumo, 1
+FROM productos p
+JOIN inventario i ON i.nombre_insumo = p.nombre_producto
+WHERE p.tipo_producto <> 'combo';
