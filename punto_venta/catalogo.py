@@ -83,6 +83,21 @@ def buscar_producto_por_id(id_producto):
     return _repo.buscar_producto_por_id(id_producto)
 
 
+def categorias_disponibles(periodo):
+    """Devuelve, en el mismo orden que CATEGORIAS, únicamente las
+    categorías que tienen al menos un producto disponible para el
+    periodo indicado ('desayuno' o 'almuerzo'). Así el sidebar del
+    cajero no muestra pestañas vacías (por ejemplo, no muestra
+    "Postres" si ningún postre está habilitado en el horario
+    actual, o no muestra categorías que solo tienen productos de
+    desayuno mientras está activo el menú de almuerzo)."""
+
+    disponibles = obtener_productos_del_periodo(periodo)
+    categorias_con_productos = {p["categoria"] for p in disponibles}
+
+    return [c for c in CATEGORIAS if c in categorias_con_productos]
+
+
 def descontar_stock(id_producto, cantidad):
     """El descuento real del inventario ocurre de forma
     transaccional dentro de la base de datos (procedimiento

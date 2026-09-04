@@ -32,13 +32,14 @@ from estilos import (
     ROJO, ROJO_CLARO, ROJO_OSCURO, CREMA,
     FILTRO_REESCALADO, resolver_carpeta_recursos, buscar_logo
 )
-from panel_admin.datos_admin import RepositorioProductos
+from basedatos.repositorio_productos import RepositorioProductos
 from panel_admin.vista_inventario import VistaInventario
 from panel_admin.vista_categorias import VistaCategorias
 from panel_admin.vista_cajeros import VistaCajeros
 from panel_admin.vista_ventas import VistaVentas
 from panel_admin.vista_pedidos import VistaPedidos
 from panel_admin.vista_reportes import VistaReportes
+from panel_admin.vista_cobro import VistaCobro
 
 
 ADMIN_ACTUAL = "Administrador"  # nombre de respaldo si se abre sin pasar por el login
@@ -48,6 +49,7 @@ CARPETA_LOGO = resolver_carpeta_recursos(CARPETA_BASE)
 
 # Cada entrada del sidebar y la clase de Vista que le corresponde.
 SECCIONES = [
+    ("💳", "Cobro", "cobro", VistaCobro),
     ("📦", "Inventario", "inventario", VistaInventario),
     ("🏷", "Categorías", "categorias", VistaCategorias),
     ("🧑‍🍳", "Cajeros", "cajeros", VistaCajeros),

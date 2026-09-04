@@ -1,0 +1,64 @@
+[
+  {
+    "id_usuario": null,
+    "cajero": "Administrador",
+    "tipo_pedido": "llevar",
+    "mesa": null,
+    "notas": null,
+    "metodo_pago": "mixto",
+    "detalle_pago": {
+      "efectivo": 0.0,
+      "tarjeta": 63.0
+    },
+    "items": [
+      {
+        "id": 48,
+        "nombre": "Alitas BBQ",
+        "precio": 55.0,
+        "cantidad": 1
+      },
+      {
+        "id": 21,
+        "nombre": "Café",
+        "precio": 8.0,
+        "cantidad": 1
+      }
+    ],
+    "total": 63.0,
+    "id": 1
+  },
+  {
+    "id_usuario": null,
+    "cajero": "Administrador",
+    "tipo_pedido": "mesa",
+    "mesa": 9,
+    "notas": null,
+    "metodo_pago": "efectivo",
+    "detalle_pago": {
+      "recibido": 103.0,
+      "cambio": 0.0
+    },
+    "items": [
+      {
+        "id": 48,
+        "nombre": "Alitas BBQ",
+        "precio": 55.0,
+        "cantidad": 1
+      },
+      {
+        "id": 21,
+        "nombre": "Café",
+        "precio": 8.0,
+        "cantidad": 1
+      },
+      {
+        "id": 7,
+        "nombre": "Chicken Burger",
+        "precio": 40.0,
+        "cantidad": 1
+      }
+    ],
+    "total": 103.0,
+    "id": 2
+  }
+]

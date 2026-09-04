@@ -12,7 +12,7 @@ import datetime
 import tkinter as tk
 from tkinter import messagebox
 
-from estilos import ROJO, ROJO_CLARO, BLANCO, TEXTO, GRIS, BORDE
+from estilos import ROJO, ROJO_CLARO, ROJO_OSCURO, BLANCO, CREMA, TEXTO, GRIS, BORDE
 from punto_venta import catalogo
 from punto_venta.ventana_pago import VentanaMetodoPago
 
@@ -37,9 +37,11 @@ class PanelCarrito(tk.Frame):
         # Carrito de la venta que se está armando actualmente.
         self.carrito = []
 
-        # Tipo de pedido: "mesa" o "llevar".
+        # Tipo de pedido: "mesa" o "llevar". Por defecto arranca
+        # en "Mesa 1" (la mesa predeterminada del negocio); el
+        # cajero puede cambiarla con el selector de mesas.
         self.tipo_pedido = "mesa"
-        self.numero_mesa = 4
+        self.numero_mesa = 1
 
         self.pack_propagate(False)
 
@@ -170,20 +172,57 @@ class PanelCarrito(tk.Frame):
     # ========================================================
 
     def elegir_mesa(self):
-        """Al presionar el botón de mesa se despliega un menú con
-        los números de mesa disponibles para elegir."""
+        """Al presionar el botón de mesa se despliega un selector
+        con los números de mesa disponibles, con el mismo estilo
+        del resto de la app (no el menú gris del sistema
+        operativo). La mesa actualmente elegida (Mesa 4 por
+        defecto) queda resaltada en rojo."""
 
-        menu = tk.Menu(self, tearoff=0)
+        ventana = tk.Toplevel(self)
+        ventana.overrideredirect(True)
+        ventana.configure(bg=BORDE)
+        ventana.attributes("-topmost", True)
 
-        for numero in range(1, 13):
-            menu.add_command(
-                label=f"Mesa {numero}", command=lambda n=numero: self._set_mesa(n)
+        contenedor = tk.Frame(ventana, bg=BLANCO)
+        contenedor.pack(padx=1, pady=1)
+
+        tk.Label(
+            contenedor, text="Selecciona una mesa", font=("Segoe UI", 11, "bold"),
+            fg=TEXTO, bg=BLANCO
+        ).pack(anchor="w", padx=15, pady=(12, 8))
+
+        cuadricula = tk.Frame(contenedor, bg=BLANCO)
+        cuadricula.pack(padx=15, pady=(0, 15))
+
+        columnas = 4
+
+        for indice, numero in enumerate(range(1, 13)):
+
+            activo = self.tipo_pedido == "mesa" and numero == self.numero_mesa
+
+            boton = tk.Button(
+                cuadricula, text=str(numero), font=("Segoe UI", 12, "bold"),
+                width=4, height=2, relief="flat", bd=0, cursor="hand2",
+                bg=ROJO_CLARO if activo else CREMA,
+                fg="white" if activo else TEXTO,
+                activebackground=ROJO, activeforeground="white",
+                command=lambda n=numero: self._elegir_mesa_y_cerrar(n, ventana)
             )
+            boton.grid(row=indice // columnas, column=indice % columnas, padx=4, pady=4)
+
+        ventana.update_idletasks()
 
         x = self.btn_tipo_mesa.winfo_rootx()
-        y = self.btn_tipo_mesa.winfo_rooty() + self.btn_tipo_mesa.winfo_height()
+        y = self.btn_tipo_mesa.winfo_rooty() + self.btn_tipo_mesa.winfo_height() + 4
+        ventana.geometry(f"+{x}+{y}")
 
-        menu.tk_popup(x, y)
+        ventana.bind("<FocusOut>", lambda e: ventana.destroy())
+        ventana.focus_force()
+
+    def _elegir_mesa_y_cerrar(self, numero, ventana):
+
+        self._set_mesa(numero)
+        ventana.destroy()
 
     def _set_mesa(self, numero):
 
