@@ -373,7 +373,7 @@ class PanelCarrito(tk.Frame):
         }
 
         mensaje = (
-            f"Venta registrada correctamente en la base de datos.\n\n"
+            f"Pago registrado correctamente.\n\n"
             f"Total: Q{total:.2f}\n"
             f"Método de pago: {nombres_metodo.get(metodo, metodo)}\n"
         )
@@ -387,11 +387,17 @@ class PanelCarrito(tk.Frame):
             )
 
         if self.tipo_pedido == "mesa":
-            mensaje += f"Pedido: Mesa {self.numero_mesa}"
+            mensaje += f"Pedido: Mesa {self.numero_mesa}\n"
         else:
-            mensaje += "Pedido: Para Llevar"
+            mensaje += "Pedido: Para Llevar\n"
 
-        messagebox.showinfo("Pago realizado", mensaje)
+        # El pago queda registrado de inmediato, pero el pedido
+        # todavía no se marca como entregado: pasa a la pantalla
+        # de Cocina (estado "enviado_cocina") y se entrega solo
+        # cuando el cocinero lo marca como listo.
+        mensaje += "\n🍳 El pedido fue enviado a cocina."
+
+        messagebox.showinfo("Pedido enviado a cocina", mensaje)
 
         self.carrito.clear()
         self.actualizar_resumen()

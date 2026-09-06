@@ -42,6 +42,7 @@ FONDO_INPUT = "#FAFAFA"
 # "usuarios" de mr_burguer_db (usuario + contraseña con hash).
 # Según el rol devuelto, IniciarSesion.py decide a qué pantalla
 # redirigir: "administrador" -> MenuAdministrador.py
+#            "cocinero"      -> Cocina.py
 #            cualquier otro  -> MenuPrincipal.py (cajero)
 # ============================================================
 
@@ -799,6 +800,10 @@ class IniciarSesion(tk.Tk):
 
                 self.abrir_menu_administrador()
 
+            elif datos_usuario["rol"] == "cocinero":
+
+                self.abrir_cocina()
+
             else:
 
                 self.abrir_menu_principal()
@@ -913,6 +918,17 @@ class IniciarSesion(tk.Tk):
         self._abrir_ventana(
             "MenuAdministrador.py",
             "el menú de administrador"
+        )
+
+    # ========================================================
+    # ABRIR COCINA
+    # ========================================================
+
+    def abrir_cocina(self):
+
+        self._abrir_ventana(
+            "Cocina.py",
+            "la pantalla de cocina"
         )
 
 

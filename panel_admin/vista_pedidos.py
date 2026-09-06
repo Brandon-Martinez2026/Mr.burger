@@ -14,6 +14,12 @@ from estilos import CREMA, BLANCO, GRIS, BORDE, crear_encabezado, preparar_estil
 import datos_ventas
 
 
+ESTADOS_TEXTO = {
+    "enviado_cocina": "🍳 En cocina",
+    "entregado": "✔ Entregado",
+}
+
+
 class VistaPedidos(tk.Frame):
 
     def __init__(self, parent, controlador):
@@ -64,11 +70,13 @@ class VistaPedidos(tk.Frame):
                 f"{it['cantidad']}x {it['nombre']}" for it in venta.get("items", [])
             )
 
+            estado_texto = ESTADOS_TEXTO.get(venta.get("estado"), venta.get("estado", ""))
+
             tabla.insert(
                 "", "end",
                 values=(
                     venta["id"], venta.get("fecha", ""), venta.get("cajero", ""),
-                    tipo, resumen_items, f"Q{venta.get('total', 0):.2f}", "✔ Completado"
+                    tipo, resumen_items, f"Q{venta.get('total', 0):.2f}", estado_texto
                 )
             )
 

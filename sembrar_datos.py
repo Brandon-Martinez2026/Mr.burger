@@ -80,6 +80,32 @@ def sembrar_usuarios():
         else:
             print("Usuario 'cajero' ya existía: no se modificó.")
 
+        # --- cocina: se crea solo si no existe (requiere haber
+        #     corrido migraciones/003_cocina_y_compras.sql, que es
+        #     la que agrega el rol 'cocinero') ---
+        cursor.execute("SELECT id_usuario FROM usuarios WHERE usuario = 'cocina'")
+
+        if cursor.fetchone() is None:
+
+            cursor.execute("SELECT id_rol FROM roles WHERE nombre_rol = 'cocinero'")
+            fila_rol_cocinero = cursor.fetchone()
+
+            if fila_rol_cocinero is None:
+                print(
+                    "No existe el rol 'cocinero' todavía: ejecuta "
+                    "migraciones/003_cocina_y_compras.sql y vuelve a correr "
+                    "sembrar_datos.py para crear el usuario de cocina."
+                )
+            else:
+                cursor.execute(
+                    """INSERT INTO usuarios (nombre_completo, usuario, contrasena_hash, id_rol)
+                       VALUES ('Cocina', 'cocina', %s, %s)""",
+                    (generar_hash("cocina123"), fila_rol_cocinero[0])
+                )
+                print("Usuario creado -> usuario: cocina | contraseña: cocina123 | rol: cocinero")
+        else:
+            print("Usuario 'cocina' ya existía: no se modificó.")
+
         conexion.commit()
 
     except mysql.connector.Error as error:

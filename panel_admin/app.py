@@ -8,6 +8,7 @@ secciones del dashboard, cada una en su propio archivo:
 
     panel_admin/vista_inventario.py
     panel_admin/vista_categorias.py
+    panel_admin/vista_comprar.py
     panel_admin/vista_cajeros.py
     panel_admin/vista_ventas.py
     panel_admin/vista_pedidos.py
@@ -35,6 +36,7 @@ from estilos import (
 from basedatos.repositorio_productos import RepositorioProductos
 from panel_admin.vista_inventario import VistaInventario
 from panel_admin.vista_categorias import VistaCategorias
+from panel_admin.vista_comprar import VistaComprar
 from panel_admin.vista_cajeros import VistaCajeros
 from panel_admin.vista_ventas import VistaVentas
 from panel_admin.vista_pedidos import VistaPedidos
@@ -50,6 +52,7 @@ CARPETA_LOGO = resolver_carpeta_recursos(CARPETA_BASE)
 SECCIONES = [
     ("📦", "Inventario", "inventario", VistaInventario),
     ("🏷", "Categorías", "categorias", VistaCategorias),
+    ("🛒", "Comprar Productos", "comprar", VistaComprar),
     ("🧑‍🍳", "Cajeros", "cajeros", VistaCajeros),
     ("💵", "Ventas", "ventas", VistaVentas),
     ("📋", "Pedidos", "pedidos", VistaPedidos),

@@ -172,7 +172,7 @@ def cargar_ventas():
 
     try:
         cursor.execute(
-            """SELECT p.id_pedido, p.fecha_hora, u.nombre_completo AS cajero,
+            """SELECT p.id_pedido, p.fecha_hora, p.estado, u.nombre_completo AS cajero,
                       p.tipo_pedido, p.numero_mesa, p.metodo_pago, p.total, p.cambio
                  FROM pedidos p
                  JOIN usuarios u ON u.id_usuario = p.id_usuario
@@ -206,6 +206,7 @@ def cargar_ventas():
             ventas.append({
                 "id": id_pedido,
                 "fecha": fila["fecha_hora"].strftime("%Y-%m-%d %H:%M:%S"),
+                "estado": fila["estado"],
                 "cajero": fila["cajero"],
                 "tipo_pedido": fila["tipo_pedido"],
                 "mesa": fila["numero_mesa"],
