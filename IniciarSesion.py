@@ -11,27 +11,41 @@ except ImportError:
     print("pip install pillow")
     sys.exit(1)
 
+# Permite importar el paquete local "basedatos" sin importar
+# desde dónde se ejecute este archivo.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from basedatos.repositorio_usuarios import autenticar
+from basedatos.conexion import ErrorBaseDatos
+
 
 # ============================================================
 # COLORES
 # ============================================================
 
-ROJO = "#A92718"
-ROJO_OSCURO = "#7E1D14"
+ROJO = "#C0392B"
+ROJO_OSCURO = "#7A2418"
 CREMA = "#FBF0DC"
 BLANCO = "#FFFFFF"
 GRIS = "#777777"
-BORDE = "#E5D8C4"
-TEXTO = "#292929"
+BORDE = "#D9C9A8"
+TEXTO = "#2B2118"
 FONDO_INPUT = "#FAFAFA"
 
 
 # ============================================================
-# CREDENCIALES TEMPORALES
+# AUTENTICACIÓN
+# ============================================================
+# Mr.Burger se maneja únicamente con credenciales: no se pide ni
+# se guarda correo electrónico en ningún punto del sistema. Cada
+# intento de inicio de sesión se valida contra la tabla
+# "usuarios" de mr_burguer_db (usuario + contraseña con hash).
+# Según el rol devuelto, IniciarSesion.py decide a qué pantalla
+# redirigir: "administrador" -> MenuAdministrador.py
+#            "cocinero"      -> Cocina.py
+#            cualquier otro  -> MenuPrincipal.py (cajero)
 # ============================================================
 
-USUARIO_TEMPORAL = "admin"
-CONTRASENA_TEMPORAL = "admin"
 
 
 # ============================================================
@@ -77,6 +91,10 @@ class IniciarSesion(tk.Tk):
 
         self.mostrar_password = False
 
+        # Datos del usuario autenticado (id_usuario, nombre_completo,
+        # usuario, rol), llenados por autenticar() al iniciar sesión.
+        self.usuario_autenticado = None
+
         self.logo_original = None
         self.logo_tk = None
 
@@ -118,9 +136,19 @@ class IniciarSesion(tk.Tk):
             os.path.abspath(__file__)
         )
 
+        carpeta_recursos = None
+
+        for nombre in ("Recursos", "recursos"):
+            posible = os.path.join(carpeta, nombre)
+            if os.path.isdir(posible):
+                carpeta_recursos = posible
+                break
+
+        if carpeta_recursos is None:
+            carpeta_recursos = os.path.join(carpeta, "Recursos")
+
         ruta = os.path.join(
-            carpeta,
-            "recursos",
+            carpeta_recursos,
             "Logo_fondoBlanco.png"
         )
 
@@ -232,7 +260,7 @@ class IniciarSesion(tk.Tk):
 
         panel_izquierdo = tk.Frame(
             contenedor,
-            bg=CREMA
+            bg=BLANCO
         )
 
         panel_izquierdo.grid(
@@ -247,7 +275,7 @@ class IniciarSesion(tk.Tk):
 
         panel_derecho = tk.Frame(
             contenedor,
-            bg=BLANCO
+            bg=ROJO
         )
 
         panel_derecho.grid(
@@ -262,7 +290,7 @@ class IniciarSesion(tk.Tk):
 
         login = tk.Frame(
             panel_izquierdo,
-            bg=CREMA
+            bg=BLANCO
         )
 
         login.place(
@@ -281,7 +309,7 @@ class IniciarSesion(tk.Tk):
             text="MR.BURGER",
             font=("Segoe UI", 20, "bold"),
             fg=ROJO,
-            bg=CREMA
+            bg=BLANCO
         ).pack(
             pady=(0, 18)
         )
@@ -295,7 +323,7 @@ class IniciarSesion(tk.Tk):
             text="Iniciar sesión",
             font=("Segoe UI", 34, "bold"),
             fg=TEXTO,
-            bg=CREMA
+            bg=BLANCO
         ).pack()
 
         # ====================================================
@@ -307,7 +335,7 @@ class IniciarSesion(tk.Tk):
             text="Ingresa tus datos para continuar",
             font=("Segoe UI", 12),
             fg=GRIS,
-            bg=CREMA
+            bg=BLANCO
         ).pack(
             pady=(8, 38)
         )
@@ -321,7 +349,7 @@ class IniciarSesion(tk.Tk):
             text="Usuario",
             font=("Segoe UI", 11, "bold"),
             fg=TEXTO,
-            bg=CREMA
+            bg=BLANCO
         ).pack(
             anchor="w"
         )
@@ -358,7 +386,7 @@ class IniciarSesion(tk.Tk):
             text="Contraseña",
             font=("Segoe UI", 11, "bold"),
             fg=TEXTO,
-            bg=CREMA
+            bg=BLANCO
         ).pack(
             anchor="w"
         )
@@ -462,7 +490,7 @@ class IniciarSesion(tk.Tk):
             text="SALIR",
             font=("Segoe UI", 11, "bold"),
             fg=ROJO,
-            bg=CREMA,
+            bg=BLANCO,
             activeforeground=BLANCO,
             activebackground=ROJO,
             relief="solid",
@@ -486,7 +514,7 @@ class IniciarSesion(tk.Tk):
             text="Sistema de Punto de Venta",
             font=("Segoe UI", 9),
             fg=GRIS,
-            bg=CREMA
+            bg=BLANCO
         ).pack(
             pady=(26, 0)
         )
@@ -537,7 +565,7 @@ class IniciarSesion(tk.Tk):
             logo_label = tk.Label(
                 panel_derecho,
                 image=self.logo_tk,
-                bg=BLANCO,
+                bg=ROJO,
                 bd=0
             )
 
@@ -557,8 +585,8 @@ class IniciarSesion(tk.Tk):
                 panel_derecho,
                 text="MR.BURGER",
                 font=("Segoe UI", 65, "bold"),
-                fg=ROJO,
-                bg=BLANCO
+                fg=BLANCO,
+                bg=ROJO
             ).place(
                 relx=0.5,
                 rely=0.44,
@@ -573,8 +601,8 @@ class IniciarSesion(tk.Tk):
             panel_derecho,
             text="DISFRUTA CADA MOMENTO",
             font=("Segoe UI", 13, "bold"),
-            fg=ROJO,
-            bg=BLANCO
+            fg=BLANCO,
+            bg=ROJO
         ).place(
             relx=0.5,
             rely=0.80,
@@ -587,7 +615,7 @@ class IniciarSesion(tk.Tk):
 
         tk.Frame(
             panel_derecho,
-            bg=ROJO,
+            bg=BLANCO,
             height=4,
             width=200
         ).place(
@@ -744,16 +772,41 @@ class IniciarSesion(tk.Tk):
             return
 
         # ====================================================
-        # COMPROBAR CREDENCIALES
+        # COMPROBAR CREDENCIALES CONTRA LA BASE DE DATOS
         # ====================================================
 
-        if (
-            usuario == USUARIO_TEMPORAL
-            and
-            password == CONTRASENA_TEMPORAL
-        ):
+        try:
 
-            self.abrir_menu_principal()
+            datos_usuario = autenticar(usuario, password)
+
+        except ErrorBaseDatos as error:
+
+            messagebox.showerror(
+                "Mr.Burger",
+                str(error),
+                parent=self
+            )
+
+            return
+
+        if datos_usuario is not None:
+
+            # Guardamos la sesión autenticada para pasarla a la
+            # siguiente pantalla (id_usuario y nombre reales de la
+            # tabla "usuarios").
+            self.usuario_autenticado = datos_usuario
+
+            if datos_usuario["rol"] == "administrador":
+
+                self.abrir_menu_administrador()
+
+            elif datos_usuario["rol"] == "cocinero":
+
+                self.abrir_cocina()
+
+            else:
+
+                self.abrir_menu_principal()
 
         else:
 
@@ -788,10 +841,10 @@ class IniciarSesion(tk.Tk):
             self.destroy()
 
     # ========================================================
-    # ABRIR MENÚ PRINCIPAL
+    # ABRIR VENTANA (uso interno / compartido)
     # ========================================================
 
-    def abrir_menu_principal(self):
+    def _abrir_ventana(self, nombre_archivo, nombre_amigable):
 
         carpeta = os.path.dirname(
             os.path.abspath(__file__)
@@ -799,7 +852,7 @@ class IniciarSesion(tk.Tk):
 
         archivo_menu = os.path.join(
             carpeta,
-            "MenuPrincipal.py"
+            nombre_archivo
         )
 
         # ====================================================
@@ -810,24 +863,30 @@ class IniciarSesion(tk.Tk):
 
             messagebox.showerror(
                 "Error",
-                "No se encontró MenuPrincipal.py.",
+                f"No se encontró {nombre_archivo}.",
                 parent=self
             )
 
             return
 
         # ====================================================
-        # ABRIR MENÚ
+        # ABRIR VENTANA
         # ====================================================
+        # Se le pasan el id_usuario y el nombre_completo reales
+        # de la sesión autenticada (tabla "usuarios") como
+        # argumentos de línea de comandos, en ese orden, tal
+        # como los espera MenuPrincipal.py / MenuAdministrador.py.
+
+        argumentos = [sys.executable, archivo_menu]
+
+        if self.usuario_autenticado is not None:
+
+            argumentos.append(str(self.usuario_autenticado["id_usuario"]))
+            argumentos.append(self.usuario_autenticado["nombre_completo"])
 
         try:
 
-            subprocess.Popen(
-                [
-                    sys.executable,
-                    archivo_menu
-                ]
-            )
+            subprocess.Popen(argumentos)
 
             self.destroy()
 
@@ -835,9 +894,42 @@ class IniciarSesion(tk.Tk):
 
             messagebox.showerror(
                 "Error",
-                f"No se pudo abrir el menú principal:\n{e}",
+                f"No se pudo abrir {nombre_amigable}:\n{e}",
                 parent=self
             )
+
+    # ========================================================
+    # ABRIR MENÚ PRINCIPAL (CAJERO)
+    # ========================================================
+
+    def abrir_menu_principal(self):
+
+        self._abrir_ventana(
+            "MenuPrincipal.py",
+            "el menú principal"
+        )
+
+    # ========================================================
+    # ABRIR MENÚ ADMINISTRADOR
+    # ========================================================
+
+    def abrir_menu_administrador(self):
+
+        self._abrir_ventana(
+            "MenuAdministrador.py",
+            "el menú de administrador"
+        )
+
+    # ========================================================
+    # ABRIR COCINA
+    # ========================================================
+
+    def abrir_cocina(self):
+
+        self._abrir_ventana(
+            "Cocina.py",
+            "la pantalla de cocina"
+        )
 
 
 # ============================================================

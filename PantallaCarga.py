@@ -4,7 +4,7 @@ import sys
 import os
 
 try:
-    from PIL import Image, ImageTk
+    from PIL import Image, ImageTk, ImageDraw
 except ImportError:
     print("Necesitas instalar Pillow: pip install pillow")
     sys.exit(1)
@@ -19,6 +19,23 @@ except AttributeError:
     FILTRO_REESCALADO = getattr(Image, "LANCZOS", None) or getattr(Image, "ANTIALIAS")
 
 
+# ============================================================
+# COLORES
+# ============================================================
+# Paleta oficial de Mr.Burger, tomada de las figuras de
+# decoración para que todo combine de forma consistente.
+# ============================================================
+
+CREMA = "#FBF0DC"          # Fondo principal
+BEIGE_PISTA = "#F3E3C3"    # Pista/track de la barra de progreso
+TEXTO = "#2B2118"          # Texto oscuro
+GRIS = "#8A7B68"           # Texto secundario
+
+NARANJA_INICIO = "#F2891D"  # Inicio del degradado de la barra
+MARRON_MEDIO = "#5C3A21"    # Punto medio del degradado
+AMARILLO_FINAL = "#FFEB3B"  # Extremo derecho del degradado
+
+
 class PantallaCarga(tk.Tk):
 
     def __init__(self):
@@ -27,14 +44,14 @@ class PantallaCarga(tk.Tk):
         self.title("Mr.Burger")
         self.attributes("-fullscreen", False)
         self.overrideredirect(True)
-        self.geometry("600x500")
+        self.geometry("640x520")
         self.resizable(False, False)
-        self.configure(bg="#F3F3F3")
+        self.configure(bg=CREMA)
 
-        # Centrar la ventana de 500x600
+        # Centrar la ventana
         self.update_idletasks()
-        ancho_ventana = 600
-        alto_ventana = 500
+        ancho_ventana = 640
+        alto_ventana = 520
         ancho_pantalla = self.winfo_screenwidth()
         alto_pantalla = self.winfo_screenheight()
         x = (ancho_pantalla - ancho_ventana) // 2
@@ -46,44 +63,62 @@ class PantallaCarga(tk.Tk):
         self.progreso = 0
 
         # ----------------------------------------------------
-        # Ruta del logo
-        # Busca la carpeta "recursos" junto a este archivo.
-        # Esto permite mover el programa a otra computadora.
+        # Carpeta base del proyecto
         # ----------------------------------------------------
-        carpeta_base = os.path.dirname(os.path.abspath(__file__))
-        carpeta_logo = os.path.join(carpeta_base, "recursos")
+        self.carpeta_base = os.path.dirname(os.path.abspath(__file__))
 
-        self.logo_path = self._buscar_logo(
-            carpeta_logo,
-            "01_logo_p"
+        # ----------------------------------------------------
+        # LOGO PRINCIPAL (Recursos/01_logo_principal.png)
+        # ----------------------------------------------------
+        carpeta_recursos = self._resolver_carpeta(
+            self.carpeta_base,
+            "Recursos",
+            "recursos"
+        )
+
+        self.logo_path = self._buscar_archivo(
+            carpeta_recursos,
+            "01_logo_principal"
         )
 
         self.logo_img_original = None
 
         if self.logo_path:
-            print(f"Logo encontrado: {self.logo_path}")
             try:
                 self.logo_img_original = Image.open(
                     self.logo_path
                 ).convert("RGBA")
             except Exception as e:
                 print(f"No se pudo cargar el logo: {e}")
-
-        if not self.logo_path:
+        else:
             print(
-                "AVISO: no se encontró ningún logo. "
-                "Coloca Logo_fondoBlanco.png dentro de la carpeta "
-                "'recursos' junto a este archivo."
+                "AVISO: no se encontró '01_logo_principal.png' "
+                "dentro de la carpeta 'Recursos'."
             )
 
         self.logo_tk = None
+
+        # ----------------------------------------------------
+        # FIGURAS DECORATIVAS (carpeta Decoraciones)
+        # ----------------------------------------------------
+        carpeta_decoraciones = self._resolver_carpeta(
+            self.carpeta_base,
+            "Decoraciones",
+            "decoraciones"
+        )
+
+        self.figuras_originales = self._cargar_figuras(
+            carpeta_decoraciones
+        )
+
+        self.figuras_tk = []
 
         # ----------------------------------------------------
         # CANVAS
         # ----------------------------------------------------
         self.canvas = tk.Canvas(
             self,
-            bg="#FBF0DC",
+            bg=CREMA,
             highlightthickness=0,
             bd=0
         )
@@ -108,28 +143,29 @@ class PantallaCarga(tk.Tk):
     # UTILIDADES
     # ========================================================
 
-    def _buscar_logo(self, carpeta, nombre_base):
-        """Busca el logo de forma robusta en la carpeta del programa."""
+    def _resolver_carpeta(self, base, *nombres_posibles):
+        """Devuelve la primera carpeta existente entre las opciones
+        dadas (permite que el proyecto funcione sin importar si el
+        nombre de la carpeta está en mayúsculas o minúsculas)."""
 
-        extensiones = [
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".webp",
-            ".bmp"
-        ]
+        for nombre in nombres_posibles:
+            ruta = os.path.join(base, nombre)
+            if os.path.isdir(ruta):
+                return ruta
 
-        # 1. Buscar por nombre exacto en la carpeta indicada.
+        return os.path.join(base, nombres_posibles[0])
+
+    def _buscar_archivo(self, carpeta, nombre_base):
+        """Busca un archivo de imagen de forma robusta."""
+
+        extensiones = [".png", ".jpg", ".jpeg", ".webp", ".bmp"]
+
         for ext in extensiones:
-            ruta = os.path.join(
-                carpeta,
-                nombre_base + ext
-            )
+            ruta = os.path.join(carpeta, nombre_base + ext)
 
             if os.path.isfile(ruta):
                 return ruta
 
-        # 2. Buscar de forma recursiva dentro de la carpeta.
         if os.path.isdir(carpeta):
             nombre_objetivo = nombre_base.lower()
 
@@ -141,177 +177,150 @@ class PantallaCarga(tk.Tk):
                         base.lower() == nombre_objetivo
                         and ext.lower() in extensiones
                     ):
-                        return os.path.join(
-                            raiz,
-                            archivo
-                        )
+                        return os.path.join(raiz, archivo)
 
         return None
 
-    def _dibujar_blob(
-        self,
-        cx,
-        cy,
-        radio,
-        color
-    ):
-        """Dibuja una mancha/splash orgánica."""
+    def _cargar_figuras(self, carpeta):
+        """Carga las figuras decorativas (manchas) desde la carpeta
+        'Decoraciones', reemplazando las manchas dibujadas a mano
+        por las figuras oficiales de la marca."""
 
-        import math
-        import random
-
-        random.seed(int(cx + cy))
-
-        puntos = []
-
-        n = 10
-
-        for i in range(n):
-
-            angulo = (
-                2 * math.pi / n
-            ) * i
-
-            r = radio * random.uniform(
-                0.65,
-                1.05
-            )
-
-            x = (
-                cx +
-                r * math.cos(angulo)
-            )
-
-            y = (
-                cy +
-                r * math.sin(angulo)
-            )
-
-            puntos.extend([
-                x,
-                y
-            ])
-
-        self.canvas.create_polygon(
-            puntos,
-            fill=color,
-            outline="",
-            smooth=True
-        )
-
-    def _dibujar_hoja(
-        self,
-        x,
-        y,
-        escala=1.0,
-        color="#3D9B35"
-    ):
-        """Dibuja un grupo de hojas de pasto."""
-
-        import math
-
-        base_angulos = [
-            -25,
-            -10,
-            5,
-            20,
-            35
+        nombres = [
+            "FiguraMostaza.png",
+            "FiguraRoja.png",
+            "FiguraNaranja.png",
         ]
 
-        for ang in base_angulos:
+        figuras = []
 
-            largo = 45 * escala
-
-            rad = math.radians(ang)
-
-            x2 = (
-                x +
-                largo * math.cos(rad)
+        if not carpeta or not os.path.isdir(carpeta):
+            print(
+                "AVISO: no se encontró la carpeta 'Decoraciones'."
             )
+            return figuras
 
-            y2 = (
-                y -
-                largo * math.sin(rad) -
-                20 * escala
-            )
+        for nombre in nombres:
+            ruta = os.path.join(carpeta, nombre)
 
-            self.canvas.create_line(
+            if os.path.isfile(ruta):
+                try:
+                    figuras.append(
+                        Image.open(ruta).convert("RGBA")
+                    )
+                except Exception as e:
+                    print(f"No se pudo cargar {nombre}: {e}")
+
+        return figuras
+
+    # ========================================================
+    # DECORACIONES (figuras de marca en las esquinas)
+    # ========================================================
+
+    def _dibujar_decoraciones(self, ancho, alto):
+
+        if not self.figuras_originales:
+            return
+
+        self.figuras_tk = []
+
+        tam = 150
+
+        # (imagen, posición x, posición y, ancla)
+        # Se colocan sutilmente recortadas en cada esquina,
+        # igual que las manchas originales pero con las
+        # figuras oficiales de decoración.
+        posiciones = [
+            (self.figuras_originales[0 % len(self.figuras_originales)], -35, -35, "nw"),
+            (self.figuras_originales[1 % len(self.figuras_originales)], ancho + 35, -35, "ne"),
+            (self.figuras_originales[1 % len(self.figuras_originales)], -35, alto + 35, "sw"),
+            (self.figuras_originales[2 % len(self.figuras_originales)], ancho + 35, alto + 35, "se"),
+        ]
+
+        for img_original, x, y, ancla in posiciones:
+
+            img = img_original.copy()
+            img.thumbnail((tam, tam), FILTRO_REESCALADO)
+
+            # Opacidad suave para que sea elegante y no
+            # compita visualmente con el logo.
+            r, g, b, a = img.split()
+            a = a.point(lambda px: int(px * 0.85))
+            img.putalpha(a)
+
+            img_tk = ImageTk.PhotoImage(img)
+            self.figuras_tk.append(img_tk)
+
+            self.canvas.create_image(
                 x,
                 y,
-                x2,
-                y2,
-                fill=color,
-                width=6,
-                smooth=True,
-                capstyle="round"
+                image=img_tk,
+                anchor=ancla
             )
 
-    def _dibujar_decoraciones(
-        self,
-        ancho,
-        alto
-    ):
-        margen = 0
+    # ========================================================
+    # BARRA DE PROGRESO (con degradado, estilo profesional)
+    # ========================================================
 
-        # ----------------------------------------------------
-        # Manchas de colores
-        # ----------------------------------------------------
+    def _interpolar_color(self, t, c1, c2, c3):
+        """Interpola entre 3 colores: c1 -> c2 -> c3 según t (0-1)."""
 
-        self._dibujar_blob(
-            margen + 25,
-            margen + 25,
-            85,
-            "#F2B01E"
+        def hex_a_rgb(h):
+            h = h.lstrip("#")
+            return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+        r1, g1, b1 = hex_a_rgb(c1)
+        r2, g2, b2 = hex_a_rgb(c2)
+        r3, g3, b3 = hex_a_rgb(c3)
+
+        if t <= 0.5:
+            f = t / 0.5
+            r = r1 + (r2 - r1) * f
+            g = g1 + (g2 - g1) * f
+            b = b1 + (b2 - b1) * f
+        else:
+            f = (t - 0.5) / 0.5
+            r = r2 + (r3 - r2) * f
+            g = g2 + (g3 - g2) * f
+            b = b2 + (b3 - b2) * f
+
+        return (int(r), int(g), int(b), 255)
+
+    def _crear_imagen_barra(self, ancho, alto, radio, progreso_ancho):
+        """Genera la imagen de la barra de progreso con esquinas
+        redondeadas y relleno en degradado (naranja -> marrón -> amarillo)."""
+
+        barra = Image.new("RGBA", (ancho, alto), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(barra)
+
+        # Pista de fondo
+        draw.rectangle([0, 0, ancho, alto], fill=BEIGE_PISTA)
+
+        # Relleno en degradado, calculado sobre el ancho total
+        # de la barra para que el color avance de forma fluida.
+        ancho_relleno = max(0, min(int(progreso_ancho), ancho))
+
+        for x in range(ancho_relleno):
+            t = x / max(ancho - 1, 1)
+            color = self._interpolar_color(
+                t,
+                NARANJA_INICIO,
+                MARRON_MEDIO,
+                AMARILLO_FINAL
+            )
+            draw.line([(x, 0), (x, alto)], fill=color)
+
+        # Máscara de esquinas redondeadas
+        mascara = Image.new("L", (ancho, alto), 0)
+        ImageDraw.Draw(mascara).rounded_rectangle(
+            [0, 0, ancho - 1, alto - 1],
+            radius=radio,
+            fill=255
         )
 
-        self._dibujar_blob(
-            ancho - margen - 30,
-            margen + 25,
-            90,
-            "#D0432B"
-        )
+        barra.putalpha(mascara)
 
-        self._dibujar_blob(
-            margen + 20,
-            alto - margen - 30,
-            85,
-            "#D0432B"
-        )
-
-        self._dibujar_blob(
-            ancho - margen - 30,
-            alto - margen - 25,
-            90,
-            "#E8901E"
-        )
-
-        # ----------------------------------------------------
-        # Hojas decorativas
-        # ----------------------------------------------------
-
-        self._dibujar_hoja(
-            ancho * 0.60,
-            alto * 0.15,
-            escala=0.65
-        )
-
-        self._dibujar_hoja(
-            ancho * 0.10,
-            alto * 0.40,
-            escala=0.65
-        )
-
-        self._dibujar_hoja(
-            ancho * 0.85,
-            alto * 0.50,
-            escala=0.65
-        )
-
-        self._dibujar_hoja(
-            ancho * 0.38,
-            alto * 0.85,
-            escala=0.65
-        )
+        return barra
 
     # ========================================================
     # DIBUJO PRINCIPAL
@@ -325,42 +334,32 @@ class PantallaCarga(tk.Tk):
         alto = self.winfo_height()
 
         # ----------------------------------------------------
-        # Fondo decorativo
+        # Figuras decorativas de marca (esquinas)
         # ----------------------------------------------------
 
-        self._dibujar_decoraciones(
-            ancho,
-            alto
-        )
+        self._dibujar_decoraciones(ancho, alto)
 
         cx = ancho // 2
 
         # ----------------------------------------------------
-        # LOGO
+        # LOGO PRINCIPAL
         # ----------------------------------------------------
 
+        logo_y = alto // 2 - 150
         logo_alto_reservado = 0
 
         if self.logo_img_original is not None:
 
-            tam_logo = 100
+            tam_logo = 190
 
             img = self.logo_img_original.copy()
 
             img.thumbnail(
-                (
-                    tam_logo,
-                    tam_logo
-                ),
+                (tam_logo, tam_logo),
                 FILTRO_REESCALADO
             )
 
             self.logo_tk = ImageTk.PhotoImage(img)
-
-            logo_y = (
-                alto // 2 -
-                105
-            )
 
             self.canvas.create_image(
                 cx,
@@ -371,86 +370,86 @@ class PantallaCarga(tk.Tk):
 
             logo_alto_reservado = img.height
 
-        # ----------------------------------------------------
-        # TÍTULO
-        # ----------------------------------------------------
+        else:
 
-        titulo_y = (
-            alto // 2 -
-            95 +
-            (
-                logo_alto_reservado // 2
-                if self.logo_img_original
-                else 0
+            # Si no se encuentra el logo, se muestra un texto
+            # de respaldo para que la pantalla no quede vacía.
+            self.canvas.create_text(
+                cx,
+                logo_y,
+                text="MR BURGER",
+                font=("Segoe UI", 34, "bold"),
+                fill=TEXTO
             )
+
+            logo_alto_reservado = 60
+
+        # ----------------------------------------------------
+        # SUBTÍTULO (estilo splash screen profesional)
+        # ----------------------------------------------------
+        # Se calcula a partir del borde inferior real del logo
+        # para que nunca se encimen, sin importar su tamaño.
+
+        subtitulo_y = (
+            logo_y +
+            logo_alto_reservado // 2 +
+            30
         )
 
         self.canvas.create_text(
             cx,
-            titulo_y + 35,
-            text="Mr.Burger",
-            font=("Arial", 32),
-            fill="black"
+            subtitulo_y,
+            text="Sistema de Punto de Venta",
+            font=("Segoe UI", 12),
+            fill=GRIS
         )
 
         # ----------------------------------------------------
         # BARRA DE PROGRESO
         # ----------------------------------------------------
 
-        barra_ancho = 330
-        barra_alto = 28
+        barra_ancho = 360
+        barra_alto = 12
+        radio = 6
 
-        x = (
-            cx -
-            barra_ancho // 2
+        x = cx - barra_ancho // 2
+        y = subtitulo_y + 35
+
+        progreso_ancho = barra_ancho * self.progreso / 100
+
+        imagen_barra = self._crear_imagen_barra(
+            barra_ancho,
+            barra_alto,
+            radio,
+            progreso_ancho
         )
 
-        y = (
-            alto // 2 +
-            35
-        )
+        self.barra_tk = ImageTk.PhotoImage(imagen_barra)
 
-        # Fondo de la barra
-        self.canvas.create_rectangle(
+        self.canvas.create_image(
             x,
             y,
-            x + barra_ancho,
-            y + barra_alto,
-            fill="#F5D98A",
-            outline=""
+            image=self.barra_tk,
+            anchor="nw"
         )
 
-        # Progreso
-        progreso_ancho = (
-            barra_ancho *
-            self.progreso /
-            100
-        )
+        # ----------------------------------------------------
+        # TEXTO DE ESTADO (debajo de la barra)
+        # ----------------------------------------------------
 
-        self.canvas.create_rectangle(
-            x,
-            y,
-            x + progreso_ancho,
-            y + barra_alto,
-            fill="#F97316",
-            outline=""
-        )
-
-        # Porcentaje
         self.canvas.create_text(
-            x + 10,
-            y + barra_alto // 2,
-            text=f"{self.progreso}%",
-            anchor="w",
-            font=("Arial", 18),
-            fill="black"
+            cx,
+            y + barra_alto + 22,
+            text=f"Cargando... {self.progreso}%",
+            font=("Segoe UI", 10),
+            fill=GRIS
         )
 
         # ----------------------------------------------------
-        # PROGRESO RÁPIDO
+        # PROGRESO
         # ----------------------------------------------------
-        # Avanza 2% cada 15 ms para una carga más rápida
-        # y visualmente más fluida.
+        # Avanza 2% cada 15 ms para una carga fluida.
+
         if self.progreso < 100:
 
             self.progreso = min(
@@ -478,18 +477,13 @@ class PantallaCarga(tk.Tk):
 
         self.destroy()
 
-        # Carpeta donde está este archivo
-        carpeta = os.path.dirname(
-            os.path.abspath(__file__)
-        )
+        carpeta = self.carpeta_base
 
-        # Buscar IniciarSesion.py
         archivo_login = os.path.join(
             carpeta,
             "IniciarSesion.py"
         )
 
-        # Verificar que exista
         if not os.path.isfile(archivo_login):
 
             print(
