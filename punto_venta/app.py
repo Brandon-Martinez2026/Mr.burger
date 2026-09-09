@@ -69,7 +69,7 @@ class MenuPrincipal(tk.Tk):
         self.categorias = catalogo.CATEGORIAS
 
         # Categoría actual (la primera categoría disponible)
-        self.categoria_actual = self.categorias[0] if self.categorias else "comida"
+        self.categoria_actual = self.categorias[0] if self.categorias else "hamburguesas"
 
         # Periodo actual del menú: "desayuno" o "almuerzo", según
         # la hora del sistema.

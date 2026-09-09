@@ -8,10 +8,11 @@ from .conexion import obtener_conexion, ErrorBaseDatos
 
 
 ICONOS_CATEGORIA = {
-    "comida": "🍔",
+    "hamburguesas": "🍔",
+    "extras": "🍟",
     "bebidas": "🥤",
-    "postres": "🍰",
-    "combos": "🍟",
+    "desayunos": "🍳",
+    "combos": "🍽",
 }
 ICONO_CATEGORIA_DEFECTO = "🍽"
 
@@ -197,19 +198,32 @@ def listar_productos(categoria="todas", periodo="todos", busqueda=""):
         conexion.close()
 
 
-def listar_disponibles(periodo):
+def listar_disponibles(periodo, hora_prueba=None):
+    """Productos habilitados y dentro de su horario para el periodo
+    indicado ('desayuno' o 'almuerzo').
 
+    Por defecto usa la hora real del servidor de MySQL (CURTIME()),
+    que es lo que usa el Punto de Venta en producción.
 
-    consulta = _SELECT_BASE + """
+    'hora_prueba' es opcional y sirve SOLO para comprobar el horario
+    sin tener que cambiar el reloj del sistema: si se pasa un texto
+    como "08:30:00", la consulta usa esa hora en vez de la hora
+    actual. Pensado para el script de diagnóstico
+    (verificar_catalogo.py), no se usa en el Punto de Venta real.
+    """
+
+    hora_sql = "%s" if hora_prueba else "CURTIME()"
+
+    consulta = _SELECT_BASE + f"""
         WHERE p.habilitado = TRUE
           AND (
                 p.restringido_horario = FALSE
-                OR (p.hora_inicio <= p.hora_fin AND CURTIME() BETWEEN p.hora_inicio AND p.hora_fin)
-                OR (p.hora_inicio > p.hora_fin AND (CURTIME() >= p.hora_inicio OR CURTIME() <= p.hora_fin))
+                OR (p.hora_inicio <= p.hora_fin AND {hora_sql} BETWEEN p.hora_inicio AND p.hora_fin)
+                OR (p.hora_inicio > p.hora_fin AND ({hora_sql} >= p.hora_inicio OR {hora_sql} <= p.hora_fin))
           )
     """
 
-    parametros = []
+    parametros = [hora_prueba, hora_prueba, hora_prueba] if hora_prueba else []
 
     if periodo == "desayuno":
         consulta += " AND p.hora_inicio = %s"

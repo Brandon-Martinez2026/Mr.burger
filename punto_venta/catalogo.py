@@ -25,7 +25,7 @@ from basedatos import repositorio_productos as _repo
 # respaldo para que la interfaz no se quede vacía.
 # ============================================================
 
-_CATEGORIAS_RESPALDO = ["comida", "bebidas", "postres", "combos"]
+_CATEGORIAS_RESPALDO = ["hamburguesas", "extras", "bebidas", "desayunos", "combos"]
 
 CATEGORIAS = _repo.listar_categorias() or _CATEGORIAS_RESPALDO
 

@@ -7,10 +7,22 @@ cajero da clic para agregarlos al carrito.
 ------------------------------------------------------------
 """
 
+import os
 import tkinter as tk
+
+try:
+    from PIL import Image, ImageTk
+    _PIL_DISPONIBLE = True
+except ImportError:
+    _PIL_DISPONIBLE = False
 
 from estilos import CREMA, BLANCO, TEXTO, GRIS, ROJO, NARANJA, BORDE
 from punto_venta import catalogo
+import imagenes_productos
+
+# Tamaño de la foto dentro de la tarjeta de producto.
+_ANCHO_FOTO = 160
+_ALTO_FOTO = 100
 
 
 class VistaProductos(tk.Frame):
@@ -25,6 +37,13 @@ class VistaProductos(tk.Frame):
         super().__init__(parent, bg=CREMA)
 
         self.controlador = controlador
+
+        # Tkinter no mantiene una referencia propia a los PhotoImage:
+        # si no los guardamos en algún lado, el recolector de basura de
+        # Python los borra y las tarjetas se quedan en blanco. Esta
+        # caché vive mientras viva la vista y se reutiliza entre
+        # refrescos (misma ruta -> mismo PhotoImage).
+        self._fotos_cache = {}
 
         self._crear_cabecera()
 
@@ -129,6 +148,56 @@ class VistaProductos(tk.Frame):
         self._crear_fila_cliente()
 
     # ========================================================
+    # FOTO DEL PRODUCTO (con el emoji como respaldo)
+    # ========================================================
+
+    def _foto_de_producto(self, producto):
+        """Devuelve un ImageTk.PhotoImage listo para mostrarse, o
+        None si no se encontró ninguna imagen suficientemente
+        parecida al nombre del producto en Recursos/productos/, si
+        Pillow no está disponible, o si el archivo no se pudo abrir
+        (en cualquiera de esos casos la tarjeta cae de vuelta al
+        emoji, sin generar ningún error)."""
+
+        if not _PIL_DISPONIBLE:
+            return None
+
+        nombre = producto.get("nombre", "")
+
+        if nombre in self._fotos_cache:
+            return self._fotos_cache[nombre]
+
+        ruta_relativa = imagenes_productos.buscar_imagen_de_producto(nombre)
+        foto = None
+
+        if ruta_relativa:
+            ruta_absoluta = os.path.join(
+                imagenes_productos.RAIZ_PROYECTO, ruta_relativa
+            )
+            try:
+                imagen = Image.open(ruta_absoluta).convert("RGB")
+
+                # thumbnail() reduce la imagen manteniendo su proporción
+                # original (no la deforma), respetando _ANCHO_FOTO/_ALTO_FOTO
+                # como límites máximos.
+                imagen.thumbnail((_ANCHO_FOTO, _ALTO_FOTO), Image.LANCZOS)
+
+                # La pegamos centrada sobre un lienzo del tamaño fijo de
+                # la tarjeta, para que todas las tarjetas midan igual
+                # aunque las fotos originales tengan proporciones distintas.
+                lienzo = Image.new("RGB", (_ANCHO_FOTO, _ALTO_FOTO), "#FFF4DE")
+                x = (_ANCHO_FOTO - imagen.width) // 2
+                y = (_ALTO_FOTO - imagen.height) // 2
+                lienzo.paste(imagen, (x, y))
+
+                foto = ImageTk.PhotoImage(lienzo)
+            except (OSError, FileNotFoundError):
+                foto = None
+
+        self._fotos_cache[nombre] = foto
+        return foto
+
+    # ========================================================
     # DIBUJAR PRODUCTOS (cuadrícula)
     # ========================================================
 
@@ -179,9 +248,16 @@ class VistaProductos(tk.Frame):
             tarjeta.grid(row=fila, column=columna, padx=7, pady=7, sticky="nsew")
             self.productos_frame.grid_columnconfigure(columna, weight=1)
 
-            tk.Label(
-                tarjeta, text=producto["emoji"], font=("Segoe UI Emoji", 42), bg="#FFF4DE"
-            ).pack(fill="x", pady=(0, 8), ipady=15)
+            foto = self._foto_de_producto(producto)
+
+            if foto is not None:
+                etiqueta_foto = tk.Label(tarjeta, image=foto, bg="#FFF4DE")
+                etiqueta_foto.image = foto  # referencia extra, por si acaso
+                etiqueta_foto.pack(fill="x", pady=(0, 8))
+            else:
+                tk.Label(
+                    tarjeta, text=producto["emoji"], font=("Segoe UI Emoji", 42), bg="#FFF4DE"
+                ).pack(fill="x", pady=(0, 8), ipady=15)
 
             tk.Label(
                 tarjeta, text=producto["nombre"], font=("Segoe UI", 13, "bold"),
