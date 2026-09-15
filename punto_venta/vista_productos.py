@@ -16,7 +16,7 @@ try:
 except ImportError:
     _PIL_DISPONIBLE = False
 
-from estilos import CREMA, BLANCO, TEXTO, GRIS, ROJO, NARANJA, BORDE
+from estilos import CREMA, BLANCO, TEXTO, GRIS, ROJO, NARANJA, BORDE, crear_area_desplazable
 from punto_venta import catalogo
 import imagenes_productos
 
@@ -47,8 +47,12 @@ class VistaProductos(tk.Frame):
 
         self._crear_cabecera()
 
-        self.productos_frame = tk.Frame(self, bg=CREMA)
-        self.productos_frame.pack(fill="both", expand=True)
+        # La cuadrícula de productos va dentro de un área con
+        # scroll: hay categorías (por ejemplo "Combos") que tienen
+        # más tarjetas de las que caben en la pantalla, y sin esto
+        # las últimas quedaban cortadas/ocultas sin forma de verlas.
+        self._contenedor_productos, self.productos_frame = crear_area_desplazable(self, bg=CREMA)
+        self._contenedor_productos.pack(fill="both", expand=True)
 
         self.dibujar_productos()
 
@@ -140,8 +144,8 @@ class VistaProductos(tk.Frame):
 
         self._crear_cabecera()
 
-        self.productos_frame = tk.Frame(self, bg=CREMA)
-        self.productos_frame.pack(fill="both", expand=True)
+        self._contenedor_productos, self.productos_frame = crear_area_desplazable(self, bg=CREMA)
+        self._contenedor_productos.pack(fill="both", expand=True)
 
         self.dibujar_productos()
 
@@ -205,6 +209,12 @@ class VistaProductos(tk.Frame):
 
         for widget in self.productos_frame.winfo_children():
             widget.destroy()
+
+        # Vuelve a poner el scroll hasta arriba: si el cajero venía
+        # desplazado hacia abajo y cambia de categoría o busca algo
+        # distinto, debe empezar a ver la cuadrícula desde el inicio.
+        if hasattr(self, "_contenedor_productos"):
+            self._contenedor_productos.canvas.yview_moveto(0)
 
         busqueda = self.buscar_entry.get().lower()
 

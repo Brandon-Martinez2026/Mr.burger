@@ -11,6 +11,7 @@ editarla aquí.
 
 import os
 
+import tkinter as tk
 from tkinter import ttk
 
 try:
@@ -134,6 +135,80 @@ def preparar_estilo_tabla(ventana):
     )
 
     return estilo
+
+
+def crear_area_desplazable(padre, bg=BLANCO, mostrar_scrollbar=True):
+    """Crea un área con scroll vertical (Canvas + Scrollbar) para
+    usar en cualquier pantalla donde el contenido pueda ser más
+    alto que el espacio visible: la cuadrícula de productos (por
+    ejemplo la categoría "Combos", que suele tener más tarjetas de
+    las que caben en pantalla), el resumen del carrito cuando hay
+    varios productos agregados, listas de ingredientes largas, etc.
+
+    Devuelve (contenedor, interior):
+      - contenedor: Frame que se debe colocar (pack/grid) donde
+        antes iba el frame original, sin scroll.
+      - interior: Frame donde se agregan los widgets del contenido
+        real (tarjetas, filas, checkboxes...), tal como se hacía
+        antes con el frame original.
+
+    El scroll con la rueda del mouse solo queda activo mientras el
+    cursor está sobre esta área en particular, para no interferir
+    con otras áreas desplazables que pueda haber en la misma
+    ventana.
+    """
+
+    contenedor = tk.Frame(padre, bg=bg)
+
+    canvas = tk.Canvas(contenedor, bg=bg, highlightthickness=0, bd=0)
+    scrollbar = ttk.Scrollbar(contenedor, orient="vertical", command=canvas.yview)
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    canvas.pack(side="left", fill="both", expand=True)
+    if mostrar_scrollbar:
+        scrollbar.pack(side="right", fill="y")
+
+    interior = tk.Frame(canvas, bg=bg)
+    id_ventana = canvas.create_window((0, 0), window=interior, anchor="nw")
+
+    def _actualizar_scrollregion(_event=None):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    def _ajustar_ancho(event):
+        # El frame interior siempre debe medir lo mismo que el ancho
+        # visible del canvas, para que el contenido no se vea más
+        # angosto/ancho de lo que debería al redimensionar la ventana.
+        canvas.itemconfigure(id_ventana, width=event.width)
+
+    interior.bind("<Configure>", _actualizar_scrollregion)
+    canvas.bind("<Configure>", _ajustar_ancho)
+
+    def _rueda_windows_mac(event):
+        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def _rueda_linux(event):
+        canvas.yview_scroll(-1 if event.num == 4 else 1, "units")
+
+    def _activar_scroll(_event):
+        canvas.bind_all("<MouseWheel>", _rueda_windows_mac)
+        canvas.bind_all("<Button-4>", _rueda_linux)
+        canvas.bind_all("<Button-5>", _rueda_linux)
+
+    def _desactivar_scroll(_event):
+        canvas.unbind_all("<MouseWheel>")
+        canvas.unbind_all("<Button-4>")
+        canvas.unbind_all("<Button-5>")
+
+    canvas.bind("<Enter>", _activar_scroll)
+    canvas.bind("<Leave>", _desactivar_scroll)
+
+    # Referencias útiles por si quien llama necesita, por ejemplo,
+    # volver a poner el scroll hasta arriba tras redibujar el
+    # contenido (canvas.yview_moveto(0)).
+    contenedor.canvas = canvas
+    contenedor.interior = interior
+
+    return contenedor, interior
 
 
 def crear_encabezado(contenedor, titulo, subtitulo=""):
