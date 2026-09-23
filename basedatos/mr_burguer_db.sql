@@ -1,13 +1,27 @@
+-- =========================================================
+-- mr_burguer_db_full.sql
+-- ---------------------------------------------------------
+-- Script base original + migraciones integradas:
+--   002_extension_app.sql          (productos.emoji, pedidos.tipo_pedido/numero_mesa/notas)
+--   003_cocina_y_compras.sql       (rol 'cocinero', compras/compra_detalle, sp_marcar_pedido_entregado)
+--   004_descuento_y_pendientes.sql (sp_confirmar_pedido con parámetro de descuento)
+--
+-- Este archivo reemplaza al script original + las 3 migraciones:
+-- ejecutando SOLO este archivo obtienes la base de datos ya en
+-- su estado final. No vuelvas a correr las migraciones sueltas
+-- sobre una base creada con este script.
+-- =========================================================
+
 DROP DATABASE IF EXISTS mr_burguer_db;
 CREATE DATABASE mr_burguer_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE mr_burguer_db;
 
--- Roles
+-- Roles  (incluye 'cocinero' -> migración 003)
 CREATE TABLE roles (
     id_rol      INT AUTO_INCREMENT PRIMARY KEY,
-    nombre_rol  ENUM('administrador','usuario','inhabilitado') NOT NULL UNIQUE
+    nombre_rol  ENUM('administrador','usuario','inhabilitado','cocinero') NOT NULL UNIQUE
 );
-INSERT INTO roles (nombre_rol) VALUES ('administrador'), ('usuario'), ('inhabilitado');
+INSERT INTO roles (nombre_rol) VALUES ('administrador'), ('usuario'), ('inhabilitado'), ('cocinero');
 
 -- Usuarios
 CREATE TABLE usuarios (
@@ -26,11 +40,12 @@ CREATE TABLE categorias (
     nombre_categoria VARCHAR(50) NOT NULL UNIQUE
 );
 
--- Productos (platillos y combps)
+-- Productos (platillos y combos)  -- incluye emoji -> migración 002
 CREATE TABLE productos (
     id_producto         INT AUTO_INCREMENT PRIMARY KEY,
     nombre_producto     VARCHAR(100) NOT NULL,
     descripcion         VARCHAR(255),
+    emoji               VARCHAR(10) NOT NULL DEFAULT '🍽',
     precio              DECIMAL(10,2) NOT NULL CHECK (precio >= 0),
     id_categoria        INT,
     tipo_producto       ENUM('platillo','combo','bebida','extra') NOT NULL DEFAULT 'platillo',
@@ -72,10 +87,13 @@ CREATE TABLE producto_insumo (
     FOREIGN KEY (id_insumo) REFERENCES inventario(id_insumo)
 );
 
--- Pedidos
+-- Pedidos  -- incluye tipo_pedido / numero_mesa / notas -> migración 002
 CREATE TABLE pedidos (
     id_pedido        INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario       INT NOT NULL,
+    tipo_pedido      ENUM('mesa','llevar') NOT NULL DEFAULT 'mesa',
+    numero_mesa      INT DEFAULT NULL,
+    notas            VARCHAR(255) DEFAULT NULL,
     fecha_hora       DATETIME DEFAULT CURRENT_TIMESTAMP,
     estado           ENUM('en_proceso','confirmado','enviado_cocina','entregado','cancelado')
                      NOT NULL DEFAULT 'en_proceso',
@@ -87,7 +105,7 @@ CREATE TABLE pedidos (
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
 );
 
--- Detalle de pedido 	
+-- Detalle de pedido
 CREATE TABLE detalle_pedido (
     id_detalle       INT AUTO_INCREMENT PRIMARY KEY,
     id_pedido        INT NOT NULL,
@@ -99,7 +117,7 @@ CREATE TABLE detalle_pedido (
     FOREIGN KEY (id_producto) REFERENCES productos(id_producto)
 );
 
--- Pagos de un pedido 
+-- Pagos de un pedido
 CREATE TABLE pedido_pagos (
     id_pago      INT AUTO_INCREMENT PRIMARY KEY,
     id_pedido    INT NOT NULL,
@@ -107,6 +125,28 @@ CREATE TABLE pedido_pagos (
     monto        DECIMAL(10,2) NOT NULL CHECK (monto > 0),
     fecha_pago   DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_pedido) REFERENCES pedidos(id_pedido) ON DELETE CASCADE
+);
+
+-- Compras a proveedores (reabastecimiento de inventario) -> migración 003
+CREATE TABLE compras (
+    id_compra    INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario   INT NOT NULL,
+    fecha_hora   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    proveedor    VARCHAR(150) DEFAULT NULL,
+    notas        VARCHAR(255) DEFAULT NULL,
+    total        DECIMAL(10,2) NOT NULL DEFAULT 0,
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
+
+CREATE TABLE compra_detalle (
+    id_compra_detalle INT AUTO_INCREMENT PRIMARY KEY,
+    id_compra         INT NOT NULL,
+    id_producto       INT NOT NULL,
+    cantidad          INT NOT NULL CHECK (cantidad > 0),
+    costo_unitario    DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (costo_unitario >= 0),
+    subtotal_linea    DECIMAL(10,2) GENERATED ALWAYS AS (cantidad * costo_unitario) STORED,
+    FOREIGN KEY (id_compra) REFERENCES compras(id_compra) ON DELETE CASCADE,
+    FOREIGN KEY (id_producto) REFERENCES productos(id_producto)
 );
 
 -- =========================================================
@@ -127,6 +167,9 @@ CREATE INDEX idx_pedidos_fecha_hora ON pedidos(fecha_hora);
 CREATE INDEX idx_detalle_pedido_id_pedido ON detalle_pedido(id_pedido);
 CREATE INDEX idx_detalle_pedido_id_producto ON detalle_pedido(id_producto);
 CREATE INDEX idx_pedido_pagos_id_pedido ON pedido_pagos(id_pedido);
+CREATE INDEX idx_compras_id_usuario ON compras(id_usuario);
+CREATE INDEX idx_compra_detalle_id_compra ON compra_detalle(id_compra);
+CREATE INDEX idx_compra_detalle_id_producto ON compra_detalle(id_producto);
 
 
 CREATE VIEW vista_menu_disponible AS
@@ -223,6 +266,20 @@ BEGIN
     END IF;
 END$$
 
+-- Compras: mantiene compras.total sincronizado con sus líneas -> migración 003
+CREATE TRIGGER trg_after_insert_compra_detalle
+AFTER INSERT ON compra_detalle
+FOR EACH ROW
+BEGIN
+    UPDATE compras
+       SET total = (
+                SELECT COALESCE(SUM(subtotal_linea), 0)
+                  FROM compra_detalle
+                 WHERE id_compra = NEW.id_compra
+           )
+     WHERE id_compra = NEW.id_compra;
+END$$
+
 DELIMITER ;
 
 DELIMITER $$
@@ -287,10 +344,14 @@ BEGIN
     END IF;
 END$$
 
+-- sp_confirmar_pedido: versión final con parámetro de descuento -> migración 004
+-- (valida el pago contra subtotal - descuento y deja "total" ya con el descuento aplicado)
 CREATE PROCEDURE sp_confirmar_pedido(
-    IN p_id_pedido INT
+    IN p_id_pedido INT,
+    IN p_descuento DECIMAL(10,2)
 )
 BEGIN
+    DECLARE v_subtotal          DECIMAL(10,2);
     DECLARE v_total             DECIMAL(10,2);
     DECLARE v_total_pagado      DECIMAL(10,2);
     DECLARE v_metodos_distintos INT;
@@ -314,7 +375,13 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Inventario insuficiente para completar el pedido';
     END IF;
 
-    SELECT total INTO v_total FROM pedidos WHERE id_pedido = p_id_pedido;
+    SELECT subtotal INTO v_subtotal FROM pedidos WHERE id_pedido = p_id_pedido;
+
+    SET v_total = v_subtotal - IFNULL(p_descuento, 0);
+
+    IF v_total < 0 THEN
+        SET v_total = 0;
+    END IF;
 
     SELECT COALESCE(SUM(monto), 0), COUNT(DISTINCT metodo_pago)
     INTO v_total_pagado, v_metodos_distintos
@@ -347,18 +414,64 @@ BEGIN
     UPDATE pedidos
     SET estado         = 'enviado_cocina',
         metodo_pago    = v_metodo_final,
-        monto_recibido = v_total_pagado
+        monto_recibido = v_total_pagado,
+        total          = v_total
     WHERE id_pedido = p_id_pedido;
 END$$
+
 #pollo
 CREATE PROCEDURE sp_actualizar_rol_usuario(
     IN p_id_usuario INT,
-    IN p_nuevo_rol   ENUM('administrador','usuario','inhabilitado')
+    IN p_nuevo_rol   ENUM('administrador','usuario','inhabilitado','cocinero')
 )
 BEGIN
     DECLARE v_id_rol INT;
     SELECT id_rol INTO v_id_rol FROM roles WHERE nombre_rol = p_nuevo_rol;
     UPDATE usuarios SET id_rol = v_id_rol WHERE id_usuario = p_id_usuario;
+END$$
+
+-- Compras: agrega línea de compra y aumenta el stock del insumo asociado -> migración 003
+CREATE PROCEDURE sp_agregar_producto_compra(
+    IN p_id_compra      INT,
+    IN p_id_producto    INT,
+    IN p_cantidad       INT,
+    IN p_costo_unitario DECIMAL(10,2)
+)
+BEGIN
+    DECLARE v_id_insumo INT DEFAULT NULL;
+
+    INSERT INTO compra_detalle (id_compra, id_producto, cantidad, costo_unitario)
+    VALUES (p_id_compra, p_id_producto, p_cantidad, p_costo_unitario);
+
+    SELECT pi.id_insumo INTO v_id_insumo
+      FROM producto_insumo pi
+     WHERE pi.id_producto = p_id_producto
+     LIMIT 1;
+
+    IF v_id_insumo IS NOT NULL THEN
+        UPDATE inventario
+           SET cantidad_actual = cantidad_actual + p_cantidad
+         WHERE id_insumo = v_id_insumo;
+    END IF;
+END$$
+
+-- Cocina: marca como entregado un pedido ya enviado a cocina -> migración 003
+CREATE PROCEDURE sp_marcar_pedido_entregado(
+    IN p_id_pedido INT
+)
+BEGIN
+    DECLARE v_estado VARCHAR(20);
+
+    SELECT estado INTO v_estado FROM pedidos WHERE id_pedido = p_id_pedido;
+
+    IF v_estado IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pedido no existe';
+    ELSEIF v_estado <> 'enviado_cocina' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT =
+            'Solo se pueden marcar como entregados los pedidos que están en cocina';
+    ELSE
+        UPDATE pedidos SET estado = 'entregado' WHERE id_pedido = p_id_pedido;
+    END IF;
 END$$
 
 DELIMITER ;
