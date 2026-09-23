@@ -1,5 +1,10 @@
 """
-se enseña todo en un json
+repositorio_ventas.py
+------------------------------------------------------------
+Todas las ventas y pedidos se guardan y se leen directamente de
+MySQL (tablas pedidos, detalle_pedido y pedido_pagos) — nada se
+guarda en archivos locales ni en JSON.
+------------------------------------------------------------
 """
 
 import mysql.connector
@@ -102,7 +107,9 @@ def guardar_venta(venta):
         else:
             raise ErrorVenta(f"Método de pago no reconocido: {metodo}")
 
-        cursor.callproc("sp_confirmar_pedido", (id_pedido,))
+        descuento = float(venta.get("descuento", 0) or 0)
+
+        cursor.callproc("sp_confirmar_pedido", (id_pedido, descuento))
 
         conexion.commit()
 
@@ -121,6 +128,83 @@ def guardar_venta(venta):
     resultado = dict(venta)
     resultado["id"] = id_pedido
     return resultado
+
+
+# ================================================================
+# GUARDAR UN PEDIDO SIN COBRARLO TODAVÍA (para atenderlo después)
+# ================================================================
+
+def guardar_pedido_pendiente(pedido):
+    """pedido: {
+        "id_usuario": int (opcional si se manda "cajero"),
+        "cajero": nombre (usado solo como respaldo),
+        "tipo_pedido": "mesa" | "llevar",
+        "mesa": int o None,
+        "notas": str opcional,
+        "items": [{"id": id_producto, "nombre", "precio", "cantidad"}],
+    }
+    Crea el pedido y agrega cada producto, pero NO registra pagos
+    ni lo confirma: queda con estado 'en_proceso' (pendiente),
+    visible desde la sección Pedidos del Panel de Administrador,
+    para cobrarlo más tarde. Devuelve el id_pedido asignado."""
+
+    items = pedido.get("items", [])
+
+    if not items:
+        raise ErrorVenta("El pedido no tiene productos.")
+
+    conexion = obtener_conexion()
+    cursor = conexion.cursor()
+
+    try:
+        id_usuario = pedido.get("id_usuario")
+
+        if id_usuario is None:
+            id_usuario = _resolver_id_usuario(cursor, pedido.get("cajero"))
+
+        cursor.execute(
+            """INSERT INTO pedidos (id_usuario, tipo_pedido, numero_mesa, notas)
+               VALUES (%s, %s, %s, %s)""",
+            (
+                id_usuario,
+                pedido.get("tipo_pedido", "mesa"),
+                pedido.get("mesa"),
+                pedido.get("notas"),
+            )
+        )
+
+        id_pedido = cursor.lastrowid
+
+        for item in items:
+
+            id_producto = item.get("id")
+
+            if id_producto is None:
+                raise ErrorVenta(
+                    f"El producto \"{item.get('nombre', '?')}\" no tiene un id "
+                    "válido; no se puede registrar en la base de datos."
+                )
+
+            cursor.callproc(
+                "sp_agregar_producto_pedido",
+                (id_pedido, id_producto, item.get("cantidad", 1))
+            )
+
+        conexion.commit()
+
+    except mysql.connector.Error as error:
+        conexion.rollback()
+        raise ErrorVenta(error.msg if hasattr(error, "msg") else str(error)) from error
+
+    except ErrorVenta:
+        conexion.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conexion.close()
+
+    return id_pedido
 
 
 def _resolver_id_usuario(cursor, nombre_cajero):
@@ -172,7 +256,7 @@ def cargar_ventas():
 
     try:
         cursor.execute(
-            """SELECT p.id_pedido, p.fecha_hora, u.nombre_completo AS cajero,
+            """SELECT p.id_pedido, p.fecha_hora, p.estado, u.nombre_completo AS cajero,
                       p.tipo_pedido, p.numero_mesa, p.metodo_pago, p.total, p.cambio
                  FROM pedidos p
                  JOIN usuarios u ON u.id_usuario = p.id_usuario
@@ -206,6 +290,7 @@ def cargar_ventas():
             ventas.append({
                 "id": id_pedido,
                 "fecha": fila["fecha_hora"].strftime("%Y-%m-%d %H:%M:%S"),
+                "estado": fila["estado"],
                 "cajero": fila["cajero"],
                 "tipo_pedido": fila["tipo_pedido"],
                 "mesa": fila["numero_mesa"],

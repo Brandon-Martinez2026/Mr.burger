@@ -168,7 +168,7 @@ class VistaInventario(tk.Frame):
                 values=(
                     producto.get("emoji", ""),
                     producto["nombre"].replace("\n", " "),
-                    producto["categoria"].capitalize(),
+                    producto["categoria"],
                     producto["periodo"].capitalize(),
                     f"Q{producto['precio']:.2f}",
                     stock if stock is not None else "—"

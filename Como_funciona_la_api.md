@@ -25,6 +25,14 @@ pedido/mesa/notas):
 mysql -u root -p mr_burguer_db < migraciones/002_extension_app.sql
 ```
 
+Y la migración que agrega el rol de cocinero (para la pantalla
+de Cocina) y las tablas de compras/reabastecimiento (para el
+apartado "Comprar Productos" del Panel de Administrador):
+
+```bash
+mysql -u root -p mr_burguer_db < migraciones/003_cocina_y_compras.sql
+```
+
 ## 3. Configurar la conexión
 
 Por defecto el programa se conecta a:
@@ -55,7 +63,7 @@ Variables disponibles: `MRBURGER_DB_HOST`, `MRBURGER_DB_PORT`,
 ```bash
 python sembrar_datos.py
 ```
-Agrega 2 usuarios base 
+Agrega 3 usuarios base (administrador, cajero y cocina)
 
 También agrega las categorías y algunos productos de ejemplo si
 la tabla `productos` está vacía.
@@ -66,11 +74,12 @@ la tabla `productos` está vacía.
 python IniciarSesion.py
 ```
 
-Inicia sesión con `admin`/`admin123` (Panel de Administrador) o
-`cajero`/`cajero123` (Punto de Venta). A partir de aquí, todo lo
-que se haga en el programa —agregar productos, categorías,
-registrar ventas, cambios de inventario— se guarda directamente
-en `mr_burguer_db`.
+Inicia sesión con `admin`/`admin123` (Panel de Administrador),
+`cajero`/`cajero123` (Punto de Venta) o `cocina`/`cocina123`
+(pantalla de Cocina). A partir de aquí, todo lo que se haga en
+el programa —agregar productos, categorías, registrar ventas,
+compras, cambios de inventario, entregar pedidos— se guarda
+directamente en `mr_burguer_db`.
 
 ## lo conectado a la base de datos
 
@@ -83,7 +92,16 @@ en `mr_burguer_db`.
   productos, se registran los pagos (incluye pago mixto) y se
   confirma usando los procedimientos `sp_agregar_producto_pedido`,
   `sp_registrar_pago` y `sp_confirmar_pedido`, que ya validan y
-  descuentan el inventario real.
+  descuentan el inventario real. Al confirmarse, el pedido queda
+  en estado `enviado_cocina` (no `entregado`): la entrega real la
+  marca la pantalla de Cocina.
+- **Cocina**: muestra los pedidos con estado `enviado_cocina`
+  (los más antiguos primero) con sus productos y notas; el botón
+  "Marcar como Listo" llama a `sp_marcar_pedido_entregado`, que
+  solo permite pasar un pedido de `enviado_cocina` a `entregado`.
 - **Panel de Administrador**: alta/edición/baja de productos y
-  categorías, consulta de inventario, ventas, pedidos, cajeros y
-  reportes — todo contra la base de datos.
+  categorías, consulta de inventario, ventas, pedidos (con su
+  estado real: en cocina / entregado), cajeros y reportes — todo
+  contra la base de datos. El apartado "Comprar Productos"
+  registra compras a proveedores (`compras`/`compra_detalle`) y
+  aumenta el stock real mediante `sp_agregar_producto_compra`.

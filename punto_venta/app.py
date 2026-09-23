@@ -1,3 +1,17 @@
+"""
+app.py (punto_venta)
+------------------------------------------------------------
+Ventana principal del Punto de Venta (antes todo esto vivía en
+un único archivo MenuPrincipal.py). Esta clase solo se encarga
+de la ventana, el sidebar y de unir las piezas:
+
+    - punto_venta/catalogo.py        -> datos de productos
+    - punto_venta/vista_productos.py -> cuadrícula de productos
+    - punto_venta/panel_carrito.py   -> carrito y cobro
+    - punto_venta/ventana_pago.py    -> ventana de método de pago
+------------------------------------------------------------
+"""
+
 import os
 import sys
 
@@ -19,16 +33,8 @@ from punto_venta.vista_productos import VistaProductos
 from punto_venta.panel_carrito import PanelCarrito
 
 
-# ============================================================
-# CAJERO ACTUAL
-# ============================================================
-# Nombre del cajero que tiene la sesión abierta en este punto
-# de venta. Se usa para guardar a qué cajero pertenece cada
-# venta, de modo que el administrador pueda consultarlas por
-# separado en el apartado "Cajeros".
-# ============================================================
 
-CAJERO_ACTUAL = "Carlos"
+CAJERO_ACTUAL = "Cajero"
 
 CARPETA_BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CARPETA_LOGO = resolver_carpeta_recursos(CARPETA_BASE)
@@ -243,8 +249,8 @@ class MenuPrincipal(tk.Tk):
 
         for categoria in self.categorias:
             self.crear_boton_menu(
-                catalogo.ICONOS_CATEGORIA.get(categoria, "🍽"),
-                categoria.capitalize(),
+                catalogo.icono_de_categoria(categoria),
+                categoria,
                 categoria,
                 lambda c=categoria: self.filtrar_categoria(c),
                 padre=self.categorias_frame
@@ -266,8 +272,9 @@ class MenuPrincipal(tk.Tk):
 
         label = tk.Label(
             boton, text=f"{icono}   {texto}",
-            font=("Segoe UI", 13, "bold" if activo else "normal"),
-            fg="white", bg=color, anchor="w", padx=15, pady=12
+            font=("Segoe UI", 12, "bold" if activo else "normal"),
+            fg="white", bg=color, anchor="w", justify="left",
+            wraplength=210, padx=15, pady=10
         )
         label.pack(fill="x")
 

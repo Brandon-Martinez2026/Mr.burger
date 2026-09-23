@@ -1,5 +1,3 @@
-# panel_admin/datos_admin.py — completo
-
 """
 datos_admin.py
 ------------------------------------------------------------
