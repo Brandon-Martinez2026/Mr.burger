@@ -535,19 +535,305 @@ INSERT INTO combo_detalle (id_combo, id_producto_incluido, cantidad) VALUES
 ((SELECT id_producto FROM productos WHERE nombre_producto='Combo Fiesta Mr. Burger'), (SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'), 5);
 
 -- =========================================================
--- 5) INVENTARIO: stock de 350 por cada producto individual
---    (no se crea insumo para los combos, ya que su stock
---    depende de los insumos de los productos que los componen)
+-- 5) INVENTARIO: insumos reales (ingredientes), no productos
+--    Cada platillo/extra/bebida/desayuno tiene su propia
+--    receta en producto_insumo con los ingredientes que
+--    realmente lleva. Los combos NO tienen insumo propio:
+--    su consumo se calcula sumando los insumos de los
+--    productos que incluyen (ver combo_detalle más abajo).
 -- =========================================================
 
-INSERT INTO inventario (nombre_insumo, unidad_medida, cantidad_actual, cantidad_minima)
-SELECT nombre_producto, 'unidad', 350, 20
-FROM productos
-WHERE tipo_producto <> 'combo';
+INSERT INTO inventario (nombre_insumo, unidad_medida, cantidad_actual, cantidad_minima) VALUES
+-- Panes y bases
+('Pan de hamburguesa',        'unidad', 500, 50),
+('Pan de hamburguesa pequeño','unidad', 200, 30),
+('Pan brioche',                'unidad', 150, 20),
+('Pan bagel',                  'unidad', 150, 20),
+('Tortilla de waffle',         'unidad', 150, 20),
+('Mezcla para pancake',        'g',      15000, 2000),
+-- Carnes y proteínas
+('Carne de res (patty)',       'unidad', 500, 50),
+('Pechuga de pollo empanizada','unidad', 300, 30),
+('Tocino',                     'g',      10000, 1000),
+('Huevo',                      'unidad', 600, 60),
+('Jamón',                      'g',      5000, 500),
+('Base vegetariana (legumbres)','unidad',150, 20),
+-- Quesos y lácteos
+('Queso cheddar (rebanada)',   'unidad', 800, 80),
+('Queso crema',                'g',      5000, 500),
+('Queso fresco',                'g',      5000, 500),
+('Mantequilla',                'g',      5000, 500),
+('Crema',                      'ml',     5000, 500),
+('Leche',                      'ml',     20000, 2000),
+-- Vegetales y frescos
+('Lechuga',                     'g',      10000, 1000),
+('Tomate',                      'g',      10000, 1000),
+('Cebolla',                     'g',      10000, 1000),
+('Aro de cebolla (empanizado)', 'unidad', 1000, 100),
+('Piña asada (rodaja)',        'unidad', 300, 30),
+('Pimiento',                    'g',      5000, 500),
+('Plátano',                     'unidad', 400, 40),
+('Frijol volteado',             'g',      10000, 1000),
+-- Salsas y condimentos
+('Salsa especial',              'ml',     8000, 800),
+('Salsa BBQ',                   'ml',     8000, 800),
+('Mayonesa',                    'ml',     8000, 800),
+('Miel maple',                  'ml',     8000, 800),
+('Salsa para nuggets',          'ml',     5000, 500),
+-- Papas y nuggets
+('Papa (porción individual)',   'g',      50000, 5000),
+('Nugget de pollo (pieza)',     'unidad', 3000, 300),
+('Galleta',                     'unidad', 400, 40),
+-- Bebidas / café
+('Jarabe de gaseosa (12oz)',    'unidad', 1000, 100),
+('Jarabe de gaseosa (grande)',  'unidad', 500, 50),
+('Limón / fruta natural',       'g',      10000, 1000),
+('Café molido',                 'g',      10000, 1000),
+('Base de malteada',            'ml',     10000, 1000),
+('Jugo concentrado',            'ml',     8000, 800),
+('Agua embotellada',            'unidad', 500, 50),
+-- Empaques
+('Vaso desechable',             'unidad', 2000, 200),
+('Caja para hamburguesa',       'unidad', 1000, 100);
 
--- Vincula cada producto individual con su propio insumo (1 unidad de insumo = 1 unidad de producto)
+-- ---------------------------------------------------------
+-- 5.1) RECETAS (producto_insumo) — productos individuales
+-- ---------------------------------------------------------
+
+-- Hamburguesas
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Clásica'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pan de hamburguesa'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Clásica'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Carne de res (patty)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Clásica'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Queso cheddar (rebanada)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Clásica'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Lechuga'), 20),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Clásica'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Tomate'), 20),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Clásica'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Cebolla'), 15);
+
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Doble Carne'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pan de hamburguesa'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Doble Carne'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Carne de res (patty)'), 2),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Doble Carne'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Queso cheddar (rebanada)'), 2),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Doble Carne'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Lechuga'), 20),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Doble Carne'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Tomate'), 20);
+
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Queso Burguesa'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pan de hamburguesa'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Queso Burguesa'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Carne de res (patty)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Queso Burguesa'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Queso cheddar (rebanada)'), 2),
+((SELECT id_producto FROM productos WHERE nombre_producto='Queso Burguesa'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Salsa especial'), 20);
+
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa BBQ'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pan de hamburguesa'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa BBQ'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Carne de res (patty)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa BBQ'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Queso cheddar (rebanada)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa BBQ'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Tocino'), 30),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa BBQ'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Aro de cebolla (empanizado)'), 2),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa BBQ'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Salsa BBQ'), 25);
+
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Hawaiana'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pan de hamburguesa'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Hawaiana'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Carne de res (patty)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Hawaiana'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Queso cheddar (rebanada)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Hawaiana'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Piña asada (rodaja)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Hawaiana'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Tocino'), 25);
+
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Vegetariana'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pan de hamburguesa'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Vegetariana'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Base vegetariana (legumbres)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Vegetariana'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Queso cheddar (rebanada)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Vegetariana'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Lechuga'), 20),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Vegetariana'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Tomate'), 20);
+
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Chicken Burger'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pan de hamburguesa'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Chicken Burger'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pechuga de pollo empanizada'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Chicken Burger'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Lechuga'), 15),
+((SELECT id_producto FROM productos WHERE nombre_producto='Chicken Burger'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Mayonesa'), 15);
+
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Pequeña'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pan de hamburguesa pequeño'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Pequeña'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Carne de res (patty)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Pequeña'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Queso cheddar (rebanada)'), 1);
+
+-- Extras y acompañamientos
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Papas Fritas (individual)'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Papa (porción individual)'), 150);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Papas Fritas (grande)'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Papa (porción individual)'), 250);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Papas con queso y tocino'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Papa (porción individual)'), 200),
+((SELECT id_producto FROM productos WHERE nombre_producto='Papas con queso y tocino'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Queso cheddar (rebanada)'), 2),
+((SELECT id_producto FROM productos WHERE nombre_producto='Papas con queso y tocino'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Tocino'), 30);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Aros de cebolla'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Aro de cebolla (empanizado)'), 8);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Galletas'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Galleta'), 3);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Nuggets de pollo (6 pzas)'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Nugget de pollo (pieza)'), 6),
+((SELECT id_producto FROM productos WHERE nombre_producto='Nuggets de pollo (6 pzas)'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Salsa para nuggets'), 30);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Nuggets de pollo (3 pzas)'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Nugget de pollo (pieza)'), 3),
+((SELECT id_producto FROM productos WHERE nombre_producto='Nuggets de pollo (3 pzas)'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Salsa para nuggets'), 15);
+
+-- Bebidas
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Jarabe de gaseosa (12oz)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Vaso desechable'), 1);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (grande)'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Jarabe de gaseosa (grande)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (grande)'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Vaso desechable'), 1);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Limonada / Refresco natural'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Limón / fruta natural'), 100),
+((SELECT id_producto FROM productos WHERE nombre_producto='Limonada / Refresco natural'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Vaso desechable'), 1);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Malteada'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Base de malteada'), 300),
+((SELECT id_producto FROM productos WHERE nombre_producto='Malteada'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Vaso desechable'), 1);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Café con leche'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Café molido'), 15),
+((SELECT id_producto FROM productos WHERE nombre_producto='Café con leche'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Leche'), 150);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Café'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Café molido'), 15);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Agua pura'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Agua embotellada'), 1);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Jugo'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Jugo concentrado'), 150),
+((SELECT id_producto FROM productos WHERE nombre_producto='Jugo'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Vaso desechable'), 1);
+
+-- Desayunos
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Desayuno Mr. Burger'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Huevo'), 2),
+((SELECT id_producto FROM productos WHERE nombre_producto='Desayuno Mr. Burger'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Tocino'), 40),
+((SELECT id_producto FROM productos WHERE nombre_producto='Desayuno Mr. Burger'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pan brioche'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Desayuno Mr. Burger'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Café molido'), 15);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Bagel con queso crema'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pan bagel'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Bagel con queso crema'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Queso crema'), 40);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Desayuno Chapín'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Huevo'), 2),
+((SELECT id_producto FROM productos WHERE nombre_producto='Desayuno Chapín'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Frijol volteado'), 100),
+((SELECT id_producto FROM productos WHERE nombre_producto='Desayuno Chapín'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Plátano'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Desayuno Chapín'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Crema'), 30),
+((SELECT id_producto FROM productos WHERE nombre_producto='Desayuno Chapín'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Queso fresco'), 40);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Pan queque'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Mezcla para pancake'), 150),
+((SELECT id_producto FROM productos WHERE nombre_producto='Pan queque'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Mantequilla'), 15),
+((SELECT id_producto FROM productos WHERE nombre_producto='Pan queque'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Miel maple'), 30);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Sándwich de Huevos y Tocino'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pan brioche'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Sándwich de Huevos y Tocino'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Huevo'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Sándwich de Huevos y Tocino'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Queso cheddar (rebanada)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Sándwich de Huevos y Tocino'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Tocino'), 25);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Waffle Mr. Burger'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Tortilla de waffle'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Waffle Mr. Burger'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pechuga de pollo empanizada'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Waffle Mr. Burger'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Miel maple'), 30);
+INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
+((SELECT id_producto FROM productos WHERE nombre_producto='Omelette Supremo'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Huevo'), 3),
+((SELECT id_producto FROM productos WHERE nombre_producto='Omelette Supremo'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Jamón'), 40),
+((SELECT id_producto FROM productos WHERE nombre_producto='Omelette Supremo'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Queso cheddar (rebanada)'), 1),
+((SELECT id_producto FROM productos WHERE nombre_producto='Omelette Supremo'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pimiento'), 30),
+((SELECT id_producto FROM productos WHERE nombre_producto='Omelette Supremo'),
+ (SELECT id_insumo FROM inventario WHERE nombre_insumo='Cebolla'), 20);
+
+-- ---------------------------------------------------------
+-- 5.2) RECETAS DE LOS COMBOS
+--    Se calculan automáticamente sumando: (cantidad del
+--    producto dentro del combo, según combo_detalle) x
+--    (insumo requerido por ese producto, cargado arriba).
+--    Así un combo descuenta inventario real de ingredientes.
+-- ---------------------------------------------------------
 INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida)
-SELECT p.id_producto, i.id_insumo, 1
-FROM productos p
-JOIN inventario i ON i.nombre_insumo = p.nombre_producto
-WHERE p.tipo_producto <> 'combo';
+SELECT cd.id_combo,
+       pi.id_insumo,
+       SUM(cd.cantidad * pi.cantidad_requerida) AS cantidad_requerida
+FROM combo_detalle cd
+JOIN producto_insumo pi ON pi.id_producto = cd.id_producto_incluido
+GROUP BY cd.id_combo, pi.id_insumo;
