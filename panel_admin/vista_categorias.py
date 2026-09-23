@@ -82,7 +82,7 @@ class VistaCategorias(tk.Frame):
                 "", "end", iid=categoria,
                 values=(
                     self.repo.icono_categoria(categoria),
-                    categoria.capitalize(),
+                    categoria,
                     self.repo.cantidad_por_categoria(categoria)
                 )
             )

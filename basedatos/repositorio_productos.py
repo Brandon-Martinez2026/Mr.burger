@@ -2,35 +2,88 @@
 el crud del proyecto
 """
 
+import datetime
+
 import mysql.connector
 
 from .conexion import obtener_conexion, ErrorBaseDatos
 
 
 ICONOS_CATEGORIA = {
-    "comida": "🍔",
+    "hamburguesas": "🍔",
+    "extras y acompañamientos": "🍟",
     "bebidas": "🥤",
+    "desayunos": "🍳",
+    "combos pareja": "💑",
+    "combos individuales": "🍽",
+    "combos familiares": "👨‍👩‍👧‍👦",
+    # Nombres antiguos, por si queda algún dato de pruebas anterior.
+    "comida": "🍔",
     "postres": "🍰",
     "combos": "🍟",
+    "extras": "🍟",
 }
 ICONO_CATEGORIA_DEFECTO = "🍽"
+
+
+def icono_de_categoria(categoria):
+    """Busca el ícono de una categoría sin importar mayúsculas o
+    espacios extra (las categorías vienen de la base de datos tal
+    cual las escribió el administrador, por ejemplo
+    "Extras y Acompañamientos")."""
+
+    return ICONOS_CATEGORIA.get((categoria or "").strip().lower(), ICONO_CATEGORIA_DEFECTO)
+
 
 PERIODOS = ["desayuno", "almuerzo"]
 METODOS_PAGO = {"efectivo": "Efectivo", "tarjeta": "Tarjeta", "mixto": "Mixto"}
 
 
-_HORA_INICIO_DESAYUNO = "07:00:00"
+# Límite real de horario de "Desayunos" según el schema de la
+# base de datos (mr_burguer_db.sql: hora_inicio='06:00:00',
+# hora_fin='11:00:00' para la categoría Desayunos). Es público
+# (sin guion bajo) porque punto_venta/catalogo.py también lo usa
+# para calcular el periodo actual según la hora del sistema; así
+# solo hay un lugar donde cambiar este límite en el futuro.
+HORA_INICIO_DESAYUNO = "06:00:00"
+HORA_FIN_DESAYUNO = "11:00:00"
 
 
 def _horario_de_periodo(periodo):
     if periodo == "desayuno":
-        return True, "07:00:00", "11:00:00"
-    return True, "11:00:00", "07:00:00"
+        return True, HORA_INICIO_DESAYUNO, HORA_FIN_DESAYUNO
+    return True, HORA_FIN_DESAYUNO, HORA_INICIO_DESAYUNO
+
+
+def _a_hora(valor):
+    """Normaliza lo que devuelve mysql-connector para una columna
+    TIME (puede llegar como datetime.timedelta, datetime.time o
+    str, según la versión/config del conector) a un
+    datetime.time, para poder compararlo de forma confiable.
+    Comparar el texto tal cual (ej. .startswith("07:")) es frágil:
+    un timedelta de 7 horas se imprime como "7:00:00", SIN el cero
+    a la izquierda, así que esa comparación nunca coincidía."""
+
+    if valor is None:
+        return None
+
+    if isinstance(valor, datetime.timedelta):
+        return (datetime.datetime.min + valor).time()
+
+    if isinstance(valor, datetime.time):
+        return valor
+
+    return datetime.datetime.strptime(str(valor), "%H:%M:%S").time()
 
 
 def _periodo_de_hora_inicio(hora_inicio):
-    if hora_inicio is not None and str(hora_inicio).startswith("07:"):
+
+    hora_inicio = _a_hora(hora_inicio)
+    limite_desayuno = datetime.datetime.strptime(HORA_INICIO_DESAYUNO, "%H:%M:%S").time()
+
+    if hora_inicio is not None and hora_inicio == limite_desayuno:
         return "desayuno"
+
     return "almuerzo"
 
 
@@ -167,10 +220,10 @@ def listar_productos(categoria="todas", periodo="todos", busqueda=""):
     if periodo not in (None, "todos"):
         if periodo == "desayuno":
             condiciones.append("p.hora_inicio = %s")
-            parametros.append(_HORA_INICIO_DESAYUNO)
+            parametros.append(HORA_INICIO_DESAYUNO)
         else:
             condiciones.append("(p.hora_inicio IS NULL OR p.hora_inicio <> %s)")
-            parametros.append(_HORA_INICIO_DESAYUNO)
+            parametros.append(HORA_INICIO_DESAYUNO)
 
     busqueda = (busqueda or "").strip()
 
@@ -197,26 +250,39 @@ def listar_productos(categoria="todas", periodo="todos", busqueda=""):
         conexion.close()
 
 
-def listar_disponibles(periodo):
+def listar_disponibles(periodo, hora_prueba=None):
+    """Productos habilitados y dentro de su horario para el periodo
+    indicado ('desayuno' o 'almuerzo').
 
+    Por defecto usa la hora real del servidor de MySQL (CURTIME()),
+    que es lo que usa el Punto de Venta en producción.
 
-    consulta = _SELECT_BASE + """
+    'hora_prueba' es opcional y sirve SOLO para comprobar el horario
+    sin tener que cambiar el reloj del sistema: si se pasa un texto
+    como "08:30:00", la consulta usa esa hora en vez de la hora
+    actual. Pensado para el script de diagnóstico
+    (verificar_catalogo.py), no se usa en el Punto de Venta real.
+    """
+
+    hora_sql = "%s" if hora_prueba else "CURTIME()"
+
+    consulta = _SELECT_BASE + f"""
         WHERE p.habilitado = TRUE
           AND (
                 p.restringido_horario = FALSE
-                OR (p.hora_inicio <= p.hora_fin AND CURTIME() BETWEEN p.hora_inicio AND p.hora_fin)
-                OR (p.hora_inicio > p.hora_fin AND (CURTIME() >= p.hora_inicio OR CURTIME() <= p.hora_fin))
+                OR (p.hora_inicio <= p.hora_fin AND {hora_sql} BETWEEN p.hora_inicio AND p.hora_fin)
+                OR (p.hora_inicio > p.hora_fin AND ({hora_sql} >= p.hora_inicio OR {hora_sql} <= p.hora_fin))
           )
     """
 
-    parametros = []
+    parametros = [hora_prueba, hora_prueba, hora_prueba] if hora_prueba else []
 
     if periodo == "desayuno":
         consulta += " AND p.hora_inicio = %s"
-        parametros.append(_HORA_INICIO_DESAYUNO)
+        parametros.append(HORA_INICIO_DESAYUNO)
     elif periodo == "almuerzo":
         consulta += " AND (p.hora_inicio IS NULL OR p.hora_inicio <> %s)"
-        parametros.append(_HORA_INICIO_DESAYUNO)
+        parametros.append(HORA_INICIO_DESAYUNO)
 
     consulta += " ORDER BY p.nombre_producto"
 
@@ -390,7 +456,7 @@ class RepositorioProductos:
         return listar_productos()
 
     def icono_categoria(self, categoria):
-        return ICONOS_CATEGORIA.get(categoria, ICONO_CATEGORIA_DEFECTO)
+        return icono_de_categoria(categoria)
 
     def buscar_producto_por_id(self, id_producto):
         return buscar_producto_por_id(id_producto)

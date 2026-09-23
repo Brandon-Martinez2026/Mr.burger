@@ -89,7 +89,7 @@ class PanelPedidos(tk.Frame):
         if not pedidos:
 
             mensaje = (
-                "No hay pedidos pendientes en este momento. 🎉" if pestana == "pendientes"
+                "No hay pedidos pendientes en este momento" if pestana == "pendientes"
                 else "Todavía no se ha entregado ningún pedido."
             )
 

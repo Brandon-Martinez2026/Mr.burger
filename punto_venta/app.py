@@ -63,17 +63,19 @@ class MenuPrincipal(tk.Tk):
         self.id_usuario = id_usuario
         self.cajero_actual = nombre_cajero or CAJERO_ACTUAL
 
-        # Catálogo de productos (ver nota en punto_venta/catalogo.py:
-        # son datos de ejemplo en memoria, sin conexión a base de
-        # datos todavía).
-        self.categorias = catalogo.CATEGORIAS
+        # Periodo actual del menú: "desayuno" o "almuerzo", según
+        # la hora del sistema. Se calcula primero porque decide
+        # qué categorías tienen sentido mostrar.
+        self.periodo_actual = catalogo.obtener_periodo_actual()
+
+        # Catálogo de productos. Solo se muestran las categorías
+        # que sí tienen productos disponibles en el periodo
+        # actual (por ejemplo, no se muestra "Desayunos" mientras
+        # está activo el menú de almuerzo).
+        self.categorias = catalogo.categorias_disponibles(self.periodo_actual)
 
         # Categoría actual (la primera categoría disponible)
-        self.categoria_actual = self.categorias[0] if self.categorias else "comida"
-
-        # Periodo actual del menú: "desayuno" o "almuerzo", según
-        # la hora del sistema.
-        self.periodo_actual = catalogo.obtener_periodo_actual()
+        self.categoria_actual = self.categorias[0] if self.categorias else None
 
         # Tipo de pedido / carrito: administrados por PanelCarrito.
 
@@ -96,7 +98,14 @@ class MenuPrincipal(tk.Tk):
         nuevo_periodo = catalogo.obtener_periodo_actual()
 
         if nuevo_periodo != self.periodo_actual:
+
             self.periodo_actual = nuevo_periodo
+            self.categorias = catalogo.categorias_disponibles(nuevo_periodo)
+
+            if self.categoria_actual not in self.categorias:
+                self.categoria_actual = self.categorias[0] if self.categorias else None
+
+            self._dibujar_botones_categorias()
             self.vista_productos.refrescar_periodo()
 
         self.after(60000, self._revisar_cambio_periodo)
@@ -183,16 +192,16 @@ class MenuPrincipal(tk.Tk):
         # ----------------------------------------------------
         # MENÚ (categorías del dashboard del cajero)
         # ----------------------------------------------------
+        # Van en su propio Frame para poder reconstruir solo esta
+        # parte cuando cambia el periodo (desayuno/almuerzo), sin
+        # tener que rehacer el logo ni la sección de usuario.
+        # ----------------------------------------------------
+
+        self.categorias_frame = tk.Frame(self.sidebar, bg=ROJO)
+        self.categorias_frame.pack(fill="x")
 
         self.botones_sidebar = {}
-
-        for categoria in self.categorias:
-            self.crear_boton_menu(
-                catalogo.ICONOS_CATEGORIA.get(categoria, "🍽"),
-                categoria.capitalize(),
-                categoria,
-                lambda c=categoria: self.filtrar_categoria(c)
-            )
+        self._dibujar_botones_categorias()
 
         self.crear_boton_menu("⇥", "Cerrar Caja", None, self.cerrar_caja)
 
@@ -226,22 +235,46 @@ class MenuPrincipal(tk.Tk):
             usuario, text="⌄", font=("Segoe UI", 18), fg="white", bg=ROJO_OSCURO
         ).pack(side="right", padx=15)
 
+    def _dibujar_botones_categorias(self):
+        """(Re)dibuja los botones de categoría dentro de
+        self.categorias_frame, según self.categorias. Se llama al
+        armar el sidebar por primera vez, y de nuevo cada vez que
+        cambia el periodo (desayuno/almuerzo) para no dejar
+        pestañas de categorías sin productos disponibles."""
+
+        for widget in self.categorias_frame.winfo_children():
+            widget.destroy()
+
+        self.botones_sidebar = {}
+
+        for categoria in self.categorias:
+            self.crear_boton_menu(
+                catalogo.icono_de_categoria(categoria),
+                categoria,
+                categoria,
+                lambda c=categoria: self.filtrar_categoria(c),
+                padre=self.categorias_frame
+            )
+
     # ========================================================
     # BOTONES DEL SIDEBAR
     # ========================================================
 
-    def crear_boton_menu(self, icono, texto, categoria, comando):
+    def crear_boton_menu(self, icono, texto, categoria, comando, padre=None):
+
+        padre = padre if padre is not None else self.sidebar
 
         activo = categoria is not None and categoria == self.categoria_actual
         color = ROJO_CLARO if activo else ROJO
 
-        boton = tk.Frame(self.sidebar, bg=color, cursor="hand2")
+        boton = tk.Frame(padre, bg=color, cursor="hand2")
         boton.pack(fill="x", padx=18, pady=5)
 
         label = tk.Label(
             boton, text=f"{icono}   {texto}",
-            font=("Segoe UI", 13, "bold" if activo else "normal"),
-            fg="white", bg=color, anchor="w", padx=15, pady=12
+            font=("Segoe UI", 12, "bold" if activo else "normal"),
+            fg="white", bg=color, anchor="w", justify="left",
+            wraplength=210, padx=15, pady=10
         )
         label.pack(fill="x")
 

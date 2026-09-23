@@ -3,7 +3,8 @@ panel_carrito.py
 ------------------------------------------------------------
 Panel derecho del Punto de Venta: tipo de pedido (mesa / para
 llevar), productos agregados al carrito, total y los botones
-para pagar, guardar o cancelar el pedido.
+para pagar, guardar, dividir cuenta, aplicar descuento o
+cancelar el pedido.
 ------------------------------------------------------------
 """
 
@@ -12,9 +13,13 @@ import datetime
 import tkinter as tk
 from tkinter import messagebox
 
-from estilos import ROJO, ROJO_CLARO, BLANCO, TEXTO, GRIS, BORDE
+from estilos import (
+    ROJO, ROJO_CLARO, ROJO_OSCURO, BLANCO, CREMA, TEXTO, GRIS, BORDE, VERDE,
+    crear_area_desplazable
+)
 from punto_venta import catalogo
 from punto_venta.ventana_pago import VentanaMetodoPago
+from punto_venta.ventana_dividir_cuenta import VentanaDividirCuenta
 
 import datos_ventas
 from basedatos.conexion import ErrorBaseDatos
@@ -37,9 +42,28 @@ class PanelCarrito(tk.Frame):
         # Carrito de la venta que se está armando actualmente.
         self.carrito = []
 
-        # Tipo de pedido: "mesa" o "llevar".
+        # Tipo de pedido: "mesa" o "llevar". Por defecto arranca
+        # en "Mesa 1" (la mesa predeterminada del negocio); el
+        # cajero puede cambiarla con el selector de mesas.
         self.tipo_pedido = "mesa"
-        self.numero_mesa = 4
+        self.numero_mesa = 1
+
+        # Descuento aplicado al pedido actual (ninguno por
+        # defecto). "tipo" es "porcentaje" o "monto" (fijo).
+        self.descuento_tipo = None
+        self.descuento_valor = 0.0
+
+        # Estado del flujo de "Dividir Cuenta": mientras se están
+        # cobrando las cuentas una por una, self._en_division es
+        # True y self._cuentas_pendientes guarda las que faltan.
+        self._en_division = False
+        self._cuentas_pendientes = []
+        self._cuenta_num_actual = 0
+        self._cuenta_num_total = 0
+
+        # El cuadro de notas empieza oculto; se muestra/oculta con
+        # el botón "Modificadores".
+        self._notas_visibles = False
 
         self.pack_propagate(False)
 
@@ -81,8 +105,11 @@ class PanelCarrito(tk.Frame):
         # PRODUCTOS DEL CARRITO
         # ----------------------------------------------------
 
-        self.lista_carrito = tk.Frame(self, bg=BLANCO)
-        self.lista_carrito.pack(fill="both", expand=True, padx=25, pady=15)
+        # Con scroll: si se agregan varios productos (por ejemplo un
+        # combo familiar más varios extras) la lista puede volverse
+        # más alta que el espacio disponible en el panel derecho.
+        self._contenedor_lista_carrito, self.lista_carrito = crear_area_desplazable(self, bg=BLANCO)
+        self._contenedor_lista_carrito.pack(fill="both", expand=True, padx=25, pady=15)
 
         tk.Label(
             self.lista_carrito, text="Aún no has agregado productos.",
@@ -103,39 +130,41 @@ class PanelCarrito(tk.Frame):
         self.lbl_total.pack(pady=12)
 
         # ----------------------------------------------------
-        # MODIFICADORES
+        # MODIFICADORES (muestra/oculta las notas del pedido)
         # ----------------------------------------------------
 
-        tk.Button(
+        self.btn_modificadores = tk.Button(
             self, text="Modificadores                         ⌄",
             font=("Segoe UI", 11), bg=BLANCO, fg=GRIS, relief="flat",
-            anchor="w", bd=1
-        ).pack(fill="x", padx=25, pady=5)
+            anchor="w", bd=1, cursor="hand2", command=self._alternar_notas
+        )
+        self.btn_modificadores.pack(fill="x", padx=25, pady=5)
 
         # ----------------------------------------------------
-        # NOTAS
+        # NOTAS (ocultas hasta que se abren desde "Modificadores")
         # ----------------------------------------------------
 
         self.entrada_notas = tk.Text(self, height=3, font=("Segoe UI", 10), fg=GRIS, bd=1, relief="solid")
         self.entrada_notas.insert("1.0", "Notas")
-        self.entrada_notas.pack(fill="x", padx=25, pady=5)
 
         # ----------------------------------------------------
-        # BOTONES
+        # DIVIDIR CUENTA / APLICAR DESCUENTO
         # ----------------------------------------------------
 
         botones = tk.Frame(self, bg=BLANCO)
         botones.pack(fill="x", padx=25, pady=8)
 
-        tk.Button(
+        self.btn_dividir_cuenta = tk.Button(
             botones, text="⚖\nDividir Cuenta", font=("Segoe UI", 10),
-            bg=BLANCO, relief="solid", bd=1
-        ).pack(side="left", fill="x", expand=True, padx=(0, 5), ipady=8)
+            bg=BLANCO, relief="solid", bd=1, cursor="hand2", command=self.dividir_cuenta
+        )
+        self.btn_dividir_cuenta.pack(side="left", fill="x", expand=True, padx=(0, 5), ipady=8)
 
-        tk.Button(
+        self.btn_descuento = tk.Button(
             botones, text="%\nAplicar Descuento", font=("Segoe UI", 10),
-            bg=BLANCO, relief="solid", bd=1
-        ).pack(side="left", fill="x", expand=True, padx=(5, 0), ipady=8)
+            bg=BLANCO, relief="solid", bd=1, cursor="hand2", command=self.abrir_descuento
+        )
+        self.btn_descuento.pack(side="left", fill="x", expand=True, padx=(5, 0), ipady=8)
 
         # ----------------------------------------------------
         # PAGAR
@@ -157,12 +186,12 @@ class PanelCarrito(tk.Frame):
 
         tk.Button(
             abajo, text="Guardar Pedido", font=("Segoe UI", 10),
-            bg=BLANCO, relief="solid", bd=1
+            bg=BLANCO, relief="solid", bd=1, cursor="hand2", command=self.guardar_pedido
         ).pack(side="left", fill="x", expand=True, padx=(0, 5), ipady=7)
 
         tk.Button(
             abajo, text="Cancelar", font=("Segoe UI", 10), bg=BLANCO,
-            relief="solid", bd=1, command=self.cancelar
+            relief="solid", bd=1, cursor="hand2", command=self.cancelar
         ).pack(side="left", fill="x", expand=True, padx=(5, 0), ipady=7)
 
     # ========================================================
@@ -170,20 +199,57 @@ class PanelCarrito(tk.Frame):
     # ========================================================
 
     def elegir_mesa(self):
-        """Al presionar el botón de mesa se despliega un menú con
-        los números de mesa disponibles para elegir."""
+        """Al presionar el botón de mesa se despliega un selector
+        con los números de mesa disponibles, con el mismo estilo
+        del resto de la app (no el menú gris del sistema
+        operativo). La mesa actualmente elegida (Mesa 1 por
+        defecto) queda resaltada en rojo."""
 
-        menu = tk.Menu(self, tearoff=0)
+        ventana = tk.Toplevel(self)
+        ventana.overrideredirect(True)
+        ventana.configure(bg=BORDE)
+        ventana.attributes("-topmost", True)
 
-        for numero in range(1, 13):
-            menu.add_command(
-                label=f"Mesa {numero}", command=lambda n=numero: self._set_mesa(n)
+        contenedor = tk.Frame(ventana, bg=BLANCO)
+        contenedor.pack(padx=1, pady=1)
+
+        tk.Label(
+            contenedor, text="Selecciona una mesa", font=("Segoe UI", 11, "bold"),
+            fg=TEXTO, bg=BLANCO
+        ).pack(anchor="w", padx=15, pady=(12, 8))
+
+        cuadricula = tk.Frame(contenedor, bg=BLANCO)
+        cuadricula.pack(padx=15, pady=(0, 15))
+
+        columnas = 4
+
+        for indice, numero in enumerate(range(1, 13)):
+
+            activo = self.tipo_pedido == "mesa" and numero == self.numero_mesa
+
+            boton = tk.Button(
+                cuadricula, text=str(numero), font=("Segoe UI", 12, "bold"),
+                width=4, height=2, relief="flat", bd=0, cursor="hand2",
+                bg=ROJO_CLARO if activo else CREMA,
+                fg="white" if activo else TEXTO,
+                activebackground=ROJO, activeforeground="white",
+                command=lambda n=numero: self._elegir_mesa_y_cerrar(n, ventana)
             )
+            boton.grid(row=indice // columnas, column=indice % columnas, padx=4, pady=4)
+
+        ventana.update_idletasks()
 
         x = self.btn_tipo_mesa.winfo_rootx()
-        y = self.btn_tipo_mesa.winfo_rooty() + self.btn_tipo_mesa.winfo_height()
+        y = self.btn_tipo_mesa.winfo_rooty() + self.btn_tipo_mesa.winfo_height() + 4
+        ventana.geometry(f"+{x}+{y}")
 
-        menu.tk_popup(x, y)
+        ventana.bind("<FocusOut>", lambda e: ventana.destroy())
+        ventana.focus_force()
+
+    def _elegir_mesa_y_cerrar(self, numero, ventana):
+
+        self._set_mesa(numero)
+        ventana.destroy()
 
     def _set_mesa(self, numero):
 
@@ -212,6 +278,21 @@ class PanelCarrito(tk.Frame):
             bg=ROJO_CLARO if not es_mesa else "#FFF0D5",
             fg="white" if not es_mesa else TEXTO
         )
+
+    # ========================================================
+    # MODIFICADORES (mostrar/ocultar notas del pedido)
+    # ========================================================
+
+    def _alternar_notas(self):
+
+        self._notas_visibles = not self._notas_visibles
+
+        if self._notas_visibles:
+            self.entrada_notas.pack(fill="x", padx=25, pady=5, after=self.btn_modificadores)
+            self.btn_modificadores.configure(text="Modificadores                         ⌃")
+        else:
+            self.entrada_notas.pack_forget()
+            self.btn_modificadores.configure(text="Modificadores                         ⌄")
 
     # ========================================================
     # AGREGAR PRODUCTO
@@ -247,7 +328,16 @@ class PanelCarrito(tk.Frame):
             "id": producto.get("id"),
             "nombre": producto["nombre"].replace("\n", " "),
             "precio": producto["precio"],
-            "cantidad": 1
+            "cantidad": 1,
+            # Se guarda la categoría del producto (no solo su
+            # nombre/precio) porque DialogoPersonalizar la necesita
+            # para saber qué ingredientes ofrecer al editarlo.
+            "categoria": producto.get("categoria"),
+            # Personalización del producto (quitar ingredientes,
+            # instrucciones especiales). Se editan haciendo clic en
+            # la línea del carrito; ver DialogoPersonalizar.
+            "ingredientes_quitados": [],
+            "instrucciones": "",
         })
         # Nota: conservamos "id" (id_producto) en cada línea del
         # carrito porque es lo que se usa para registrar el pedido
@@ -270,15 +360,19 @@ class PanelCarrito(tk.Frame):
                 font=("Segoe UI", 10), fg=GRIS, bg=BLANCO
             ).pack(pady=10)
 
-        total = 0
-
         for item in self.carrito:
 
             subtotal = item["precio"] * item["cantidad"]
-            total += subtotal
 
-            fila = tk.Frame(self.lista_carrito, bg=BLANCO)
-            fila.pack(fill="x", pady=8)
+            # Bloque completo de la línea (cantidad/nombre/precio +
+            # el resumen de personalización). Todo el bloque es
+            # clickeable para poder editar el producto: quitarle
+            # ingredientes o agregarle instrucciones especiales.
+            bloque = tk.Frame(self.lista_carrito, bg=BLANCO, cursor="hand2")
+            bloque.pack(fill="x", pady=8)
+
+            fila = tk.Frame(bloque, bg=BLANCO)
+            fila.pack(fill="x")
 
             tk.Label(
                 fila, text=f"{item['cantidad']}x", font=("Segoe UI", 11, "bold"),
@@ -295,8 +389,282 @@ class PanelCarrito(tk.Frame):
                 fg=TEXTO, bg=BLANCO
             ).pack(side="right")
 
+        subtotal_total, descuento_monto, total = self._calcular_totales()
+
+        if descuento_monto > 0:
+
+            fila_descuento = tk.Frame(self.lista_carrito, bg=BLANCO)
+            fila_descuento.pack(fill="x", pady=(4, 0))
+
+            texto_descuento = (
+                f"Descuento ({self.descuento_valor:.0f}%)"
+                if self.descuento_tipo == "porcentaje"
+                else "Descuento"
+            )
+
+            tk.Label(
+                fila_descuento, text=texto_descuento, font=("Segoe UI", 10),
+                fg=VERDE, bg=BLANCO
+            ).pack(side="left")
+
+            tk.Label(
+                fila_descuento, text=f"-Q{descuento_monto:.2f}", font=("Segoe UI", 10, "bold"),
+                fg=VERDE, bg=BLANCO
+            ).pack(side="right")
+
+        self.btn_descuento.configure(
+            text="%\nQuitar Descuento" if descuento_monto > 0 else "%\nAplicar Descuento"
+        )
+
         self.lbl_total.configure(text=f"Total:                    Q{total:.2f}")
         self.btn_pagar.configure(text=f"Pagar: Q{total:.2f}")
+
+    def _calcular_totales(self):
+        """Devuelve (subtotal, monto_descontado, total) del
+        carrito actual, aplicando el descuento activo (si hay)."""
+
+        subtotal = sum(item["precio"] * item["cantidad"] for item in self.carrito)
+
+        if self.descuento_tipo == "porcentaje":
+            descuento_monto = subtotal * (self.descuento_valor / 100)
+        elif self.descuento_tipo == "monto":
+            descuento_monto = self.descuento_valor
+        else:
+            descuento_monto = 0.0
+
+        descuento_monto = max(0.0, min(descuento_monto, subtotal))
+        total = round(subtotal - descuento_monto, 2)
+
+        return round(subtotal, 2), round(descuento_monto, 2), total
+
+    # ========================================================
+    # APLICAR DESCUENTO
+    # ========================================================
+
+    def abrir_descuento(self):
+
+        if not self.carrito:
+            messagebox.showwarning("Mr.Burger", "No hay productos en el pedido.")
+            return
+
+        ventana = tk.Toplevel(self)
+        ventana.title("Aplicar Descuento")
+        ventana.configure(bg=BLANCO)
+        ventana.resizable(False, False)
+        ventana.transient(self)
+        ventana.grab_set()
+        ventana.geometry("340x320")
+
+        tk.Label(
+            ventana, text="Aplicar Descuento", font=("Segoe UI", 14, "bold"),
+            fg=TEXTO, bg=BLANCO
+        ).pack(pady=(20, 15))
+
+        tipo_var = tk.StringVar(value=self.descuento_tipo or "porcentaje")
+
+        opciones = tk.Frame(ventana, bg=BLANCO)
+        opciones.pack(pady=(0, 15))
+
+        btn_porcentaje = tk.Button(
+            opciones, text="% Porcentaje", font=("Segoe UI", 10, "bold"),
+            relief="solid", bd=1, cursor="hand2",
+            command=lambda: elegir_tipo("porcentaje")
+        )
+        btn_porcentaje.pack(side="left", padx=5, ipady=6, ipadx=8)
+
+        btn_monto = tk.Button(
+            opciones, text="Q Monto fijo", font=("Segoe UI", 10, "bold"),
+            relief="solid", bd=1, cursor="hand2",
+            command=lambda: elegir_tipo("monto")
+        )
+        btn_monto.pack(side="left", padx=5, ipady=6, ipadx=8)
+
+        def refrescar_botones_tipo():
+            btn_porcentaje.configure(
+                bg=ROJO_CLARO if tipo_var.get() == "porcentaje" else BLANCO,
+                fg="white" if tipo_var.get() == "porcentaje" else TEXTO
+            )
+            btn_monto.configure(
+                bg=ROJO_CLARO if tipo_var.get() == "monto" else BLANCO,
+                fg="white" if tipo_var.get() == "monto" else TEXTO
+            )
+
+        def elegir_tipo(valor):
+            tipo_var.set(valor)
+            refrescar_botones_tipo()
+
+        tk.Label(
+            ventana, text="Valor del descuento", font=("Segoe UI", 10),
+            fg=TEXTO, bg=BLANCO
+        ).pack(anchor="w", padx=30)
+
+        entrada_valor = tk.Entry(ventana, font=("Segoe UI", 13), bd=1, relief="solid")
+        entrada_valor.pack(fill="x", padx=30, pady=(3, 15), ipady=6)
+
+        if self.descuento_tipo:
+            entrada_valor.insert(0, f"{self.descuento_valor:g}")
+
+        refrescar_botones_tipo()
+
+        def aplicar():
+
+            try:
+                valor = float(entrada_valor.get())
+            except ValueError:
+                messagebox.showwarning("Mr.Burger", "Ingresa un valor válido.", parent=ventana)
+                return
+
+            if valor < 0:
+                messagebox.showwarning("Mr.Burger", "El descuento no puede ser negativo.", parent=ventana)
+                return
+
+            if tipo_var.get() == "porcentaje" and valor > 100:
+                messagebox.showwarning("Mr.Burger", "El porcentaje no puede ser mayor a 100.", parent=ventana)
+                return
+
+            self.descuento_tipo = tipo_var.get()
+            self.descuento_valor = valor
+
+            self.actualizar_resumen()
+            ventana.destroy()
+
+        def quitar():
+            self.descuento_tipo = None
+            self.descuento_valor = 0.0
+            self.actualizar_resumen()
+            ventana.destroy()
+
+        botones = tk.Frame(ventana, bg=BLANCO)
+        botones.pack(fill="x", padx=30, pady=(5, 20))
+
+        tk.Button(
+            botones, text="Quitar", font=("Segoe UI", 10), bg=BLANCO,
+            relief="solid", bd=1, cursor="hand2", command=quitar
+        ).pack(side="left", fill="x", expand=True, padx=(0, 5), ipady=8)
+
+        tk.Button(
+            botones, text="Aplicar", font=("Segoe UI", 10, "bold"), bg=ROJO_CLARO,
+            fg="white", activebackground=ROJO, activeforeground="white",
+            relief="flat", cursor="hand2", command=aplicar
+        ).pack(side="left", fill="x", expand=True, padx=(5, 0), ipady=8)
+
+    # ========================================================
+    # DIVIDIR CUENTA
+    # ========================================================
+
+    def dividir_cuenta(self):
+
+        if not self.carrito:
+            messagebox.showwarning("Mr.Burger", "No hay productos en el pedido.")
+            return
+
+        if sum(item["cantidad"] for item in self.carrito) < 2:
+            messagebox.showwarning(
+                "Mr.Burger",
+                "Se necesita más de un producto (o más de una unidad) para poder dividir la cuenta."
+            )
+            return
+
+        VentanaDividirCuenta(self, self.carrito, self._iniciar_cuentas_divididas)
+
+    def _iniciar_cuentas_divididas(self, cuentas):
+
+        self._en_division = True
+        self._cuentas_pendientes = list(cuentas)
+        self._cuenta_num_total = len(cuentas)
+        self._cuenta_num_actual = 0
+
+        self._procesar_siguiente_cuenta()
+
+    def _procesar_siguiente_cuenta(self):
+
+        if not self._cuentas_pendientes:
+
+            self._en_division = False
+            self._cuenta_num_actual = 0
+            self._cuenta_num_total = 0
+
+            messagebox.showinfo(
+                "Dividir Cuenta", "Todas las cuentas fueron cobradas correctamente."
+            )
+
+            self._limpiar_pedido_actual()
+            return
+
+        self._cuenta_num_actual += 1
+        self.carrito = self._cuentas_pendientes.pop(0)
+
+        self.actualizar_resumen()
+
+        messagebox.showinfo(
+            "Dividir Cuenta",
+            f"Cobrando la cuenta {self._cuenta_num_actual} de {self._cuenta_num_total}."
+        )
+
+        self.pagar()
+
+    # ========================================================
+    # GUARDAR PEDIDO (sin cobrar todavía)
+    # ========================================================
+
+    def guardar_pedido(self):
+
+        if not self.carrito:
+            messagebox.showwarning("Mr.Burger", "No hay productos en el pedido.")
+            return
+
+        notas_texto = self.entrada_notas.get("1.0", "end").strip()
+
+        if notas_texto == "Notas":
+            notas_texto = ""
+
+        pedido = {
+            "id_usuario": getattr(self.controlador, "id_usuario", None),
+            "cajero": self.controlador.cajero_actual,
+            "tipo_pedido": self.tipo_pedido,
+            "mesa": self.numero_mesa if self.tipo_pedido == "mesa" else None,
+            "notas": notas_texto or None,
+            "items": [
+                {
+                    "id": item.get("id"),
+                    "nombre": item["nombre"],
+                    "precio": item["precio"],
+                    "cantidad": item["cantidad"],
+                }
+                for item in self.carrito
+            ],
+        }
+
+        try:
+            id_pedido = datos_ventas.guardar_pedido_pendiente(pedido)
+        except ErrorBaseDatos as error:
+            messagebox.showerror("No se pudo guardar el pedido", str(error))
+            return
+
+        messagebox.showinfo(
+            "Pedido guardado",
+            f"El pedido #{id_pedido} quedó guardado sin cobrar todavía.\n"
+            "Puedes atenderlo más tarde desde Pedidos, en el Panel de Administrador."
+        )
+
+        self._limpiar_pedido_actual()
+
+    # ========================================================
+    # EDITAR / PERSONALIZAR UN PRODUCTO DEL CARRITO
+    # ========================================================
+
+    def _editar_item(self, item):
+        """Se llama al hacer clic sobre un producto ya agregado al
+        carrito. Abre DialogoPersonalizar para que el cajero pueda
+        quitarle ingredientes o escribir una instrucción especial
+        (por ejemplo, 'sin tomate' en una hamburguesa)."""
+
+        def _al_guardar(ingredientes_quitados, instrucciones):
+            item["ingredientes_quitados"] = ingredientes_quitados
+            item["instrucciones"] = instrucciones
+            self.actualizar_resumen()
+
+        DialogoPersonalizar(self, item, _al_guardar)
 
     # ========================================================
     # PAGAR
@@ -308,7 +676,7 @@ class PanelCarrito(tk.Frame):
             messagebox.showwarning("Mr.Burger", "No hay productos en el pedido.")
             return
 
-        total = sum(item["precio"] * item["cantidad"] for item in self.carrito)
+        _, _, total = self._calcular_totales()
 
         VentanaMetodoPago(self.controlador, total, self._finalizar_venta)
 
@@ -318,7 +686,7 @@ class PanelCarrito(tk.Frame):
 
     def _finalizar_venta(self, metodo, detalle):
 
-        total = sum(item["precio"] * item["cantidad"] for item in self.carrito)
+        subtotal, descuento_monto, total = self._calcular_totales()
 
         notas_texto = self.entrada_notas.get("1.0", "end").strip()
 
@@ -326,14 +694,52 @@ class PanelCarrito(tk.Frame):
             notas_texto = ""
 
         # ----------------------------------------------------
+        # PERSONALIZACIÓN DE CADA PRODUCTO (ingredientes quitados /
+        # instrucciones especiales)
+        # ----------------------------------------------------
+        # La base de datos todavía no tiene una columna de notas
+        # por línea de pedido (detalle_pedido), así que por ahora
+        # esto se agrega al texto de notas general del pedido, que
+        # sí llega a la pantalla de Cocina. Cada línea del carrito
+        # de todas formas sigue guardando su propia personalización
+        # ("ingredientes_quitados" / "instrucciones") para cuando el
+        # equipo de base de datos agregue esa columna y se pueda
+        # enviar tal cual, sin tener que rehacer esta pantalla.
+        # ----------------------------------------------------
+
+        lineas_personalizacion = []
+
+        for item in self.carrito:
+
+            partes = []
+
+            if item.get("ingredientes_quitados"):
+                partes.append("sin " + ", ".join(item["ingredientes_quitados"]).lower())
+
+            if item.get("instrucciones"):
+                partes.append(item["instrucciones"])
+
+            if partes:
+                lineas_personalizacion.append(f"{item['nombre']}: " + " / ".join(partes))
+
+        if lineas_personalizacion:
+            resumen_personalizacion = "\n".join(lineas_personalizacion)
+            notas_texto = (
+                f"{notas_texto}\n{resumen_personalizacion}".strip()
+                if notas_texto else resumen_personalizacion
+            )
+
+        # ----------------------------------------------------
         # REGISTRAR LA VENTA EN LA BASE DE DATOS
         # ----------------------------------------------------
         # Esto crea el pedido, agrega cada producto, registra el
         # o los pagos y confirma el pedido (sp_confirmar_pedido),
         # que a su vez valida y descuenta el inventario real
-        # dentro de MySQL. Si algo falla (por ejemplo, no hay
-        # inventario suficiente) no se guarda nada y se avisa al
-        # cajero sin perder el carrito.
+        # dentro de MySQL, ya aplicando el descuento (requiere la
+        # migración migraciones/004_descuento_y_pendientes.sql).
+        # Si algo falla (por ejemplo, no hay inventario
+        # suficiente) no se guarda nada y se avisa al cajero sin
+        # perder el carrito.
         # ----------------------------------------------------
 
         venta = {
@@ -344,16 +750,23 @@ class PanelCarrito(tk.Frame):
             "notas": notas_texto or None,
             "metodo_pago": metodo,
             "detalle_pago": detalle,
+            "descuento": descuento_monto,
             "items": [
                 {
                     "id": item.get("id"),
                     "nombre": item["nombre"],
                     "precio": item["precio"],
                     "cantidad": item["cantidad"],
+                    # Se guardan también aquí (aunque por ahora la
+                    # base de datos los ignore) para que cuando se
+                    # agregue soporte real de personalización por
+                    # producto, los datos ya estén disponibles.
+                    "ingredientes_quitados": item.get("ingredientes_quitados") or [],
+                    "instrucciones": item.get("instrucciones") or "",
                 }
                 for item in self.carrito
             ],
-            "total": round(total, 2)
+            "total": total
         }
 
         try:
@@ -372,7 +785,13 @@ class PanelCarrito(tk.Frame):
             "mixto": "Mixto (efectivo + tarjeta)"
         }
 
+        prefijo_mensaje = (
+            f"Cuenta {self._cuenta_num_actual} de {self._cuenta_num_total} cobrada.\n\n"
+            if self._en_division else ""
+        )
+
         mensaje = (
+            f"{prefijo_mensaje}"
             f"Pago registrado correctamente.\n\n"
             f"Total: Q{total:.2f}\n"
             f"Método de pago: {nombres_metodo.get(metodo, metodo)}\n"
@@ -399,7 +818,28 @@ class PanelCarrito(tk.Frame):
 
         messagebox.showinfo("Pedido enviado a cocina", mensaje)
 
+        if self._en_division:
+            # El descuento (si había) ya se aplicó a esta primera
+            # cuenta cobrada; se limpia para no volver a aplicarlo
+            # a las cuentas que faltan del mismo pedido.
+            self.descuento_tipo = None
+            self.descuento_valor = 0.0
+
+            self._procesar_siguiente_cuenta()
+            return
+
+        self._limpiar_pedido_actual()
+
+    # ========================================================
+    # LIMPIAR EL PEDIDO ACTUAL (tras cobrar o guardar)
+    # ========================================================
+
+    def _limpiar_pedido_actual(self):
+
         self.carrito.clear()
+        self.descuento_tipo = None
+        self.descuento_valor = 0.0
+
         self.actualizar_resumen()
 
         self.entrada_notas.delete("1.0", "end")
@@ -422,5 +862,11 @@ class PanelCarrito(tk.Frame):
         confirmar = messagebox.askyesno("Cancelar pedido", "¿Deseas cancelar el pedido?")
 
         if confirmar:
-            self.carrito.clear()
-            self.actualizar_resumen()
+
+            if self._en_division:
+                self._en_division = False
+                self._cuentas_pendientes = []
+                self._cuenta_num_actual = 0
+                self._cuenta_num_total = 0
+
+            self._limpiar_pedido_actual()

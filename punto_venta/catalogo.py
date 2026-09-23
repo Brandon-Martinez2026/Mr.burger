@@ -25,23 +25,38 @@ from basedatos import repositorio_productos as _repo
 # respaldo para que la interfaz no se quede vacía.
 # ============================================================
 
-_CATEGORIAS_RESPALDO = ["comida", "bebidas", "postres", "combos"]
+_CATEGORIAS_RESPALDO = [
+    "Hamburguesas", "Extras ", "Bebidas", "Desayunos",
+    "Combos Pareja", "Combos Individuales", "Combos Familiares",
+]
 
 CATEGORIAS = _repo.listar_categorias() or _CATEGORIAS_RESPALDO
 
+def listar_categorias():
+    """Lee las categorías de la BD en el momento (a diferencia de
+    CATEGORIAS, que se calcula una sola vez al iniciar el programa).
+    Sirve para que una categoría recién creada aparezca sin reiniciar."""
+
+    return _repo.listar_categorias() or _CATEGORIAS_RESPALDO
+
+
 ICONOS_CATEGORIA = _repo.ICONOS_CATEGORIA
+icono_de_categoria = _repo.icono_de_categoria
 
 
 # ============================================================
 # HORARIOS DEL MENÚ
 # ============================================================
-# De 7:00 a 10:59 se muestra únicamente el menú de desayunos.
-# Del resto del día (11:00 a 6:59, es decir tarde, noche y
-# madrugada) se muestra únicamente el menú de almuerzo.
+# El límite real (06:00 a 10:59 = desayuno; el resto del día =
+# almuerzo) se toma de basedatos/repositorio_productos.py, que
+# es la misma constante que usa la base de datos para decidir
+# qué productos son "Desayunos" (ver mr_burguer_db.sql). Antes
+# este archivo tenía su propio "7" fijo por separado, que ya no
+# coincidía con el horario real (06:00) de la base de datos.
 # ============================================================
 
-HORA_INICIO_DESAYUNO = 7
-HORA_FIN_DESAYUNO = 11
+HORA_INICIO_DESAYUNO = int(_repo.HORA_INICIO_DESAYUNO.split(":")[0])
+HORA_FIN_DESAYUNO = int(_repo.HORA_FIN_DESAYUNO.split(":")[0])
 
 
 def obtener_periodo_actual():
@@ -71,9 +86,14 @@ def obtener_todos_los_productos():
 
 
 def obtener_productos_del_periodo(periodo):
-    """Devuelve los productos habilitados y dentro de su horario
-    que corresponden al periodo indicado ('desayuno' o
-    'almuerzo')."""
+    """Devuelve los productos correspondientes al periodo.
+
+    Si periodo es "todos", devuelve todos los productos sin
+    importar la hora. Esto se utiliza en Cobro del administrador.
+    """
+
+    if periodo == "todos":
+        return obtener_todos_los_productos()
 
     return _repo.listar_disponibles(periodo)
 
@@ -81,6 +101,19 @@ def obtener_productos_del_periodo(periodo):
 def buscar_producto_por_id(id_producto):
 
     return _repo.buscar_producto_por_id(id_producto)
+
+
+def categorias_disponibles(periodo):
+    """Devuelve, en el mismo orden que CATEGORIAS, únicamente las
+    categorías que tienen al menos un producto disponible para el
+    periodo indicado ('desayuno' o 'almuerzo'). Así el sidebar del
+    cajero no muestra pestañas vacías (por ejemplo, no muestra
+    "Desayunos" mientras está activo el menú de almuerzo)."""
+
+    disponibles = obtener_productos_del_periodo(periodo)
+    categorias_con_productos = {p["categoria"] for p in disponibles}
+
+    return [c for c in CATEGORIAS if c in categorias_con_productos]
 
 
 def descontar_stock(id_producto, cantidad):

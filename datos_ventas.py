@@ -22,6 +22,7 @@ programa tuviera que cambiar cómo pide los datos:
     "mesa": 4,               (None si es "para llevar")
     "metodo_pago": "efectivo" | "tarjeta" | "mixto",
     "detalle_pago": { ... datos específicos del método ... },
+    "descuento": 0.0,
     "items": [
         {"id": 10, "nombre": "Hamburguesa Clásica", "precio": 85, "cantidad": 2}
     ],
@@ -43,9 +44,18 @@ def cargar_ventas():
 def guardar_venta(venta):
     """Registra una venta completa en la base de datos: crea el
     pedido, agrega cada producto, registra el/los pagos y
-    confirma el pedido. Puede lanzar ErrorVenta si, por ejemplo,
+    confirma el pedido (aplicando el descuento, si venta trae la
+    clave "descuento"). Puede lanzar ErrorVenta si, por ejemplo,
     no hay inventario suficiente."""
     return _repo.guardar_venta(venta)
+
+
+def guardar_pedido_pendiente(pedido):
+    """Guarda un pedido en la base de datos sin cobrarlo todavía
+    (botón "Guardar Pedido"): queda como pendiente ('en_proceso')
+    para atenderlo/cobrarlo después desde el Panel de
+    Administrador."""
+    return _repo.guardar_pedido_pendiente(pedido)
 
 
 def ventas_por_cajero(cajero=None):

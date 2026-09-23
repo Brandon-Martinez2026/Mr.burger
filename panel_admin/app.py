@@ -41,6 +41,7 @@ from panel_admin.vista_cajeros import VistaCajeros
 from panel_admin.vista_ventas import VistaVentas
 from panel_admin.vista_pedidos import VistaPedidos
 from panel_admin.vista_reportes import VistaReportes
+from panel_admin.vista_cobro import VistaCobro
 
 
 ADMIN_ACTUAL = "Administrador"  # nombre de respaldo si se abre sin pasar por el login
@@ -50,6 +51,7 @@ CARPETA_LOGO = resolver_carpeta_recursos(CARPETA_BASE)
 
 # Cada entrada del sidebar y la clase de Vista que le corresponde.
 SECCIONES = [
+    ("💳", "Cobro", "cobro", VistaCobro),
     ("📦", "Inventario", "inventario", VistaInventario),
     ("🏷", "Categorías", "categorias", VistaCategorias),
     ("🛒", "Comprar Productos", "comprar", VistaComprar),

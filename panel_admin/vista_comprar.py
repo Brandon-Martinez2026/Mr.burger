@@ -127,7 +127,7 @@ class VistaComprar(tk.Frame):
                 "", "end", iid=str(producto["id"]),
                 values=(
                     producto.get("emoji", ""), nombre_plano,
-                    producto["categoria"].capitalize(), producto.get("stock", 0)
+                    producto["categoria"], producto.get("stock", 0)
                 )
             )
 
