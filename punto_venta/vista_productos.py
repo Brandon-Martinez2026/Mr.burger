@@ -269,6 +269,12 @@ class VistaProductos(tk.Frame):
         for widget in self.productos_frame.winfo_children():
             widget.destroy()
 
+        # Vuelve a poner el scroll hasta arriba: si el cajero venía
+        # desplazado hacia abajo y cambia de categoría o busca algo
+        # distinto, debe empezar a ver la cuadrícula desde el inicio.
+        if hasattr(self, "_contenedor_productos"):
+            self._contenedor_productos.canvas.yview_moveto(0)
+
         busqueda = self.buscar_entry.get().lower()
 
         if busqueda == "buscar plato...":

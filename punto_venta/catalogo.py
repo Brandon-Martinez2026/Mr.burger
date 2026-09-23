@@ -26,7 +26,7 @@ from basedatos import repositorio_productos as _repo
 # ============================================================
 
 _CATEGORIAS_RESPALDO = [
-    "Hamburguesas", "Extras y Acompañamientos", "Bebidas", "Desayunos",
+    "Hamburguesas", "Extras ", "Bebidas", "Desayunos",
     "Combos Pareja", "Combos Individuales", "Combos Familiares",
 ]
 

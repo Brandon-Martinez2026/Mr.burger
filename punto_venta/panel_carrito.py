@@ -102,8 +102,11 @@ class PanelCarrito(tk.Frame):
         # PRODUCTOS DEL CARRITO
         # ----------------------------------------------------
 
-        self.lista_carrito = tk.Frame(self, bg=BLANCO)
-        self.lista_carrito.pack(fill="both", expand=True, padx=25, pady=15)
+        # Con scroll: si se agregan varios productos (por ejemplo un
+        # combo familiar más varios extras) la lista puede volverse
+        # más alta que el espacio disponible en el panel derecho.
+        self._contenedor_lista_carrito, self.lista_carrito = crear_area_desplazable(self, bg=BLANCO)
+        self._contenedor_lista_carrito.pack(fill="both", expand=True, padx=25, pady=15)
 
         tk.Label(
             self.lista_carrito, text="Aún no has agregado productos.",
@@ -322,7 +325,16 @@ class PanelCarrito(tk.Frame):
             "id": producto.get("id"),
             "nombre": producto["nombre"].replace("\n", " "),
             "precio": producto["precio"],
-            "cantidad": 1
+            "cantidad": 1,
+            # Se guarda la categoría del producto (no solo su
+            # nombre/precio) porque DialogoPersonalizar la necesita
+            # para saber qué ingredientes ofrecer al editarlo.
+            "categoria": producto.get("categoria"),
+            # Personalización del producto (quitar ingredientes,
+            # instrucciones especiales). Se editan haciendo clic en
+            # la línea del carrito; ver DialogoPersonalizar.
+            "ingredientes_quitados": [],
+            "instrucciones": "",
         })
         # Nota: conservamos "id" (id_producto) en cada línea del
         # carrito porque es lo que se usa para registrar el pedido
@@ -349,8 +361,15 @@ class PanelCarrito(tk.Frame):
 
             subtotal = item["precio"] * item["cantidad"]
 
-            fila = tk.Frame(self.lista_carrito, bg=BLANCO)
-            fila.pack(fill="x", pady=8)
+            # Bloque completo de la línea (cantidad/nombre/precio +
+            # el resumen de personalización). Todo el bloque es
+            # clickeable para poder editar el producto: quitarle
+            # ingredientes o agregarle instrucciones especiales.
+            bloque = tk.Frame(self.lista_carrito, bg=BLANCO, cursor="hand2")
+            bloque.pack(fill="x", pady=8)
+
+            fila = tk.Frame(bloque, bg=BLANCO)
+            fila.pack(fill="x")
 
             tk.Label(
                 fila, text=f"{item['cantidad']}x", font=("Segoe UI", 11, "bold"),
@@ -628,6 +647,23 @@ class PanelCarrito(tk.Frame):
         self._limpiar_pedido_actual()
 
     # ========================================================
+    # EDITAR / PERSONALIZAR UN PRODUCTO DEL CARRITO
+    # ========================================================
+
+    def _editar_item(self, item):
+        """Se llama al hacer clic sobre un producto ya agregado al
+        carrito. Abre DialogoPersonalizar para que el cajero pueda
+        quitarle ingredientes o escribir una instrucción especial
+        (por ejemplo, 'sin tomate' en una hamburguesa)."""
+
+        def _al_guardar(ingredientes_quitados, instrucciones):
+            item["ingredientes_quitados"] = ingredientes_quitados
+            item["instrucciones"] = instrucciones
+            self.actualizar_resumen()
+
+        DialogoPersonalizar(self, item, _al_guardar)
+
+    # ========================================================
     # PAGAR
     # ========================================================
 
@@ -653,6 +689,42 @@ class PanelCarrito(tk.Frame):
 
         if notas_texto == "Notas":
             notas_texto = ""
+
+        # ----------------------------------------------------
+        # PERSONALIZACIÓN DE CADA PRODUCTO (ingredientes quitados /
+        # instrucciones especiales)
+        # ----------------------------------------------------
+        # La base de datos todavía no tiene una columna de notas
+        # por línea de pedido (detalle_pedido), así que por ahora
+        # esto se agrega al texto de notas general del pedido, que
+        # sí llega a la pantalla de Cocina. Cada línea del carrito
+        # de todas formas sigue guardando su propia personalización
+        # ("ingredientes_quitados" / "instrucciones") para cuando el
+        # equipo de base de datos agregue esa columna y se pueda
+        # enviar tal cual, sin tener que rehacer esta pantalla.
+        # ----------------------------------------------------
+
+        lineas_personalizacion = []
+
+        for item in self.carrito:
+
+            partes = []
+
+            if item.get("ingredientes_quitados"):
+                partes.append("sin " + ", ".join(item["ingredientes_quitados"]).lower())
+
+            if item.get("instrucciones"):
+                partes.append(item["instrucciones"])
+
+            if partes:
+                lineas_personalizacion.append(f"{item['nombre']}: " + " / ".join(partes))
+
+        if lineas_personalizacion:
+            resumen_personalizacion = "\n".join(lineas_personalizacion)
+            notas_texto = (
+                f"{notas_texto}\n{resumen_personalizacion}".strip()
+                if notas_texto else resumen_personalizacion
+            )
 
         # ----------------------------------------------------
         # REGISTRAR LA VENTA EN LA BASE DE DATOS
@@ -682,6 +754,12 @@ class PanelCarrito(tk.Frame):
                     "nombre": item["nombre"],
                     "precio": item["precio"],
                     "cantidad": item["cantidad"],
+                    # Se guardan también aquí (aunque por ahora la
+                    # base de datos los ignore) para que cuando se
+                    # agregue soporte real de personalización por
+                    # producto, los datos ya estén disponibles.
+                    "ingredientes_quitados": item.get("ingredientes_quitados") or [],
+                    "instrucciones": item.get("instrucciones") or "",
                 }
                 for item in self.carrito
             ],
