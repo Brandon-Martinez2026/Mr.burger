@@ -24,14 +24,16 @@ inició sesión (el segundo parámetro, 'controlador', es la
 instancia real de MenuAdministrador).
 
 A diferencia del cajero (que tiene un sidebar fijo de
-categorías), aquí las categorías viven en un mini dashboard
-desplegable arriba de la cuadrícula de productos: el
+categorías), aquí las categorías se eligen en un menú en cascada
+(un menú que "cae") arriba de la cuadrícula de productos: el
 administrador ya tiene su propio sidebar de navegación entre
 secciones, así que un segundo sidebar fijo se sentiría
-redundante. Las categorías que se muestran son exactamente las
-mismas y con la misma lógica que usa el cajero
-(catalogo.categorias_disponibles): solo las que sí tienen
-productos disponibles en el periodo actual.
+redundante. La lista se lee de la base de datos cada vez que se
+abre el menú, así que una categoría recién creada aparece sin
+reiniciar. El administrador puede ver todas las categorías y todos los
+productos, sin importar el horario actual. El cajero conserva su
+lógica normal de horarios porque esta vista solo afecta al panel
+de administrador.
 ------------------------------------------------------------
 """
 
@@ -60,26 +62,20 @@ class VistaCobro(tk.Frame):
         # (la misma interfaz que usa punto_venta/app.py).
         # ----------------------------------------------------
 
-        self.periodo_actual = catalogo.obtener_periodo_actual()
+        self.periodo_actual = "todos"
 
         # Mismas categorías que ve el cajero para este periodo
         # (las que sí tienen productos disponibles ahora mismo).
         # "todos" siempre se ofrece además, para ver el catálogo
         # completo del periodo de un vistazo.
-        self.categorias = catalogo.categorias_disponibles(self.periodo_actual)
+        self.categorias = catalogo.listar_categorias()
         self.categoria_actual = "todos"
 
         self.cajero_actual = getattr(self.admin, "nombre_admin", None) or "Administrador"
         self.id_usuario = getattr(self.admin, "id_usuario", None)
 
-        self._categorias_desplegadas = False
-
         self._crear_interfaz()
 
-        # Revisa cada minuto si cambió el periodo del menú (por
-        # ejemplo, de desayuno a almuerzo), igual que en el
-        # Punto de Venta.
-        self.after(60000, self._revisar_cambio_periodo)
 
     # ========================================================
     # INTERFAZ
@@ -109,7 +105,11 @@ class VistaCobro(tk.Frame):
         self.vista_productos.pack(fill="both", expand=True)
 
     # ========================================================
-    # MINI DASHBOARD DESPLEGABLE DE CATEGORÍAS
+    # MENÚ EN CASCADA DE CATEGORÍAS
+    # ========================================================
+    # Un botón que, al hacer clic, "deja caer" la lista de
+    # categorías; al elegir una, se filtran los productos y el
+    # botón muestra la categoría activa.
     # ========================================================
 
     def _crear_barra_categorias(self):
@@ -119,96 +119,72 @@ class VistaCobro(tk.Frame):
         )
         barra.pack(fill="x", pady=(0, 12))
 
-        self.btn_desplegar_categorias = tk.Button(
-            barra, text="🏷  Categorías  ▾", font=("Segoe UI", 11, "bold"),
-            fg=TEXTO, bg=BLANCO, relief="flat", bd=0, cursor="hand2",
-            anchor="w", command=self._alternar_categorias
+        tk.Label(
+            barra, text="🏷  Categoría", font=("Segoe UI", 11, "bold"),
+            fg=TEXTO, bg=BLANCO
+        ).pack(side="left", padx=(15, 12), pady=10)
+
+        self.btn_menu_categorias = tk.Menubutton(
+            barra, font=("Segoe UI", 11, "bold"),
+            fg="white", bg=ROJO_CLARO,
+            activebackground=ROJO, activeforeground="white",
+            relief="flat", bd=0, cursor="hand2",
+            anchor="w", padx=14, pady=8, width=30,
+            direction="below"
         )
-        self.btn_desplegar_categorias.pack(fill="x", padx=15, pady=10)
+        self.btn_menu_categorias.pack(side="left", pady=8)
 
-        # Panel con los botones de categoría. Empieza colapsado
-        # (no se hace pack todavía) para no ocupar espacio extra
-        # hasta que el administrador lo abra.
-        self.categorias_panel = tk.Frame(self, bg=CREMA)
+        # postcommand: justo antes de abrirse, se vuelve a llenar
+        # el menú con las categorías actuales de la base de datos.
+        self.menu_categorias = tk.Menu(
+            self.btn_menu_categorias, tearoff=0,
+            font=("Segoe UI", 11), bg=BLANCO, fg=TEXTO,
+            activebackground=ROJO_CLARO, activeforeground="white",
+            postcommand=self._llenar_menu_categorias
+        )
+        self.btn_menu_categorias.configure(menu=self.menu_categorias)
 
-        self._dibujar_botones_categorias()
+        self._llenar_menu_categorias()
+        self._actualizar_texto_boton()
 
-    def _alternar_categorias(self):
+    def _llenar_menu_categorias(self):
+        """(Re)construye las opciones del menú: \"Todos\" y luego
+        cada categoría, marcando con una palomita la activa."""
 
-        self._categorias_desplegadas = not self._categorias_desplegadas
+        self.categorias = catalogo.listar_categorias()
 
-        if self._categorias_desplegadas:
-            self.categorias_panel.pack(fill="x", pady=(0, 12))
-            self.btn_desplegar_categorias.configure(text="🏷  Categorías  ▴")
-        else:
-            self.categorias_panel.pack_forget()
-            self.btn_desplegar_categorias.configure(text="🏷  Categorías  ▾")
-
-    def _dibujar_botones_categorias(self):
-        """(Re)dibuja los botones del mini dashboard según
-        self.categorias, resaltando en rojo la categoría activa.
-        Se llama al abrir la vista, al elegir una categoría (para
-        actualizar cuál queda resaltada) y cada vez que cambia el
-        periodo (desayuno/almuerzo)."""
-
-        for widget in self.categorias_panel.winfo_children():
-            widget.destroy()
+        self.menu_categorias.delete(0, "end")
 
         opciones = [("todos", "Todos", "📋")] + [
             (categoria, categoria, catalogo.icono_de_categoria(categoria))
             for categoria in self.categorias
         ]
 
-        columnas = 3
+        for valor, texto, icono in opciones:
 
-        for indice, (valor, texto, icono) in enumerate(opciones):
+            marca = "   ✔" if valor == self.categoria_actual else ""
 
-            activo = valor == self.categoria_actual
-
-            boton = tk.Button(
-                self.categorias_panel, text=f"{icono}  {texto}",
-                font=("Segoe UI", 10, "bold" if activo else "normal"),
-                bg=ROJO_CLARO if activo else CREMA,
-                fg="white" if activo else TEXTO,
-                relief="flat", bd=0, cursor="hand2",
-                wraplength=160, justify="left", anchor="w",
-                padx=10, pady=10,
-                activebackground=ROJO, activeforeground="white",
+            self.menu_categorias.add_command(
+                label=f"{icono}  {texto}{marca}",
                 command=lambda v=valor: self._filtrar_categoria(v)
             )
-            boton.grid(
-                row=indice // columnas, column=indice % columnas,
-                padx=4, pady=4, sticky="ew"
-            )
-            self.categorias_panel.grid_columnconfigure(indice % columnas, weight=1)
+
+    def _actualizar_texto_boton(self):
+
+        if self.categoria_actual == "todos":
+            texto = "📋  Todos  ▾"
+        else:
+            icono = catalogo.icono_de_categoria(self.categoria_actual)
+            texto = f"{icono}  {self.categoria_actual}  ▾"
+
+        self.btn_menu_categorias.configure(text=texto)
 
     def _filtrar_categoria(self, categoria):
 
         self.categoria_actual = categoria
 
-        self._dibujar_botones_categorias()
+        self._actualizar_texto_boton()
         self.vista_productos.dibujar_productos()
-
-    # ========================================================
-    # PERIODO DEL MENÚ (DESAYUNO / ALMUERZO)
-    # ========================================================
-
-    def _revisar_cambio_periodo(self):
-
-        nuevo_periodo = catalogo.obtener_periodo_actual()
-
-        if nuevo_periodo != self.periodo_actual:
-
-            self.periodo_actual = nuevo_periodo
-            self.categorias = catalogo.categorias_disponibles(nuevo_periodo)
-
-            if self.categoria_actual not in self.categorias and self.categoria_actual != "todos":
-                self.categoria_actual = "todos"
-
-            self._dibujar_botones_categorias()
-            self.vista_productos.refrescar_periodo()
-
-        self.after(60000, self._revisar_cambio_periodo)
 
     # ========================================================
     # AGREGAR PRODUCTO AL CARRITO

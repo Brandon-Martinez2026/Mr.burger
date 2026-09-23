@@ -122,11 +122,14 @@ class VistaProductos(tk.Frame):
 
     def _crear_cabecera(self):
 
-        titulo_texto = (
-            "Menú de Desayuno"
-            if self.controlador.periodo_actual == "desayuno"
-            else "Menú de Almuerzo"
-        )
+        periodo = self.controlador.periodo_actual
+
+        if periodo == "desayuno":
+            titulo_texto = "Menú de Desayuno"
+        elif periodo == "todos":
+            titulo_texto = "Todos los productos"
+        else:
+            titulo_texto = "Menú de Almuerzo"
 
         encabezado = tk.Frame(self, bg=CREMA)
         encabezado.pack(fill="x", pady=(0, 18))
@@ -136,11 +139,12 @@ class VistaProductos(tk.Frame):
             fg=TEXTO, bg=CREMA
         ).pack(side="left")
 
-        horario_texto = (
-            f"🕐  Disponible de {catalogo.HORA_INICIO_DESAYUNO}:00 a {catalogo.HORA_FIN_DESAYUNO}:00"
-            if self.controlador.periodo_actual == "desayuno"
-            else f"🕐  Disponible de {catalogo.HORA_FIN_DESAYUNO}:00 a {catalogo.HORA_INICIO_DESAYUNO}:00"
-        )
+        if periodo == "desayuno":
+            horario_texto = f"🕐  Disponible de {catalogo.HORA_INICIO_DESAYUNO}:00 a {catalogo.HORA_FIN_DESAYUNO}:00"
+        elif periodo == "todos":
+            horario_texto = "🕐  Sin restricción de horario (modo administrador)"
+        else:
+            horario_texto = f"🕐  Disponible de {catalogo.HORA_FIN_DESAYUNO}:00 a {catalogo.HORA_INICIO_DESAYUNO}:00"
 
         tk.Label(
             encabezado, text=horario_texto, font=("Segoe UI", 10),

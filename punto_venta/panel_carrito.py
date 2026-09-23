@@ -13,7 +13,10 @@ import datetime
 import tkinter as tk
 from tkinter import messagebox
 
-from estilos import ROJO, ROJO_CLARO, ROJO_OSCURO, BLANCO, CREMA, TEXTO, GRIS, BORDE, VERDE
+from estilos import (
+    ROJO, ROJO_CLARO, ROJO_OSCURO, BLANCO, CREMA, TEXTO, GRIS, BORDE, VERDE,
+    crear_area_desplazable
+)
 from punto_venta import catalogo
 from punto_venta.ventana_pago import VentanaMetodoPago
 from punto_venta.ventana_dividir_cuenta import VentanaDividirCuenta

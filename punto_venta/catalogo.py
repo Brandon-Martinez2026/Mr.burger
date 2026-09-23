@@ -32,6 +32,14 @@ _CATEGORIAS_RESPALDO = [
 
 CATEGORIAS = _repo.listar_categorias() or _CATEGORIAS_RESPALDO
 
+def listar_categorias():
+    """Lee las categorías de la BD en el momento (a diferencia de
+    CATEGORIAS, que se calcula una sola vez al iniciar el programa).
+    Sirve para que una categoría recién creada aparezca sin reiniciar."""
+
+    return _repo.listar_categorias() or _CATEGORIAS_RESPALDO
+
+
 ICONOS_CATEGORIA = _repo.ICONOS_CATEGORIA
 icono_de_categoria = _repo.icono_de_categoria
 
@@ -78,9 +86,14 @@ def obtener_todos_los_productos():
 
 
 def obtener_productos_del_periodo(periodo):
-    """Devuelve los productos habilitados y dentro de su horario
-    que corresponden al periodo indicado ('desayuno' o
-    'almuerzo')."""
+    """Devuelve los productos correspondientes al periodo.
+
+    Si periodo es "todos", devuelve todos los productos sin
+    importar la hora. Esto se utiliza en Cobro del administrador.
+    """
+
+    if periodo == "todos":
+        return obtener_todos_los_productos()
 
     return _repo.listar_disponibles(periodo)
 
