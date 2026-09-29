@@ -61,7 +61,7 @@ def _cargar_pedidos_por_estado(estados, orden="ASC", limite=None):
             id_pedido = fila["id_pedido"]
 
             cursor.execute(
-                """SELECT dp.cantidad, pr.nombre_producto AS nombre
+                """SELECT dp.id_detalle, dp.cantidad, pr.nombre_producto AS nombre
                      FROM detalle_pedido dp
                      JOIN productos pr ON pr.id_producto = dp.id_producto
                     WHERE dp.id_pedido = %s
@@ -69,6 +69,16 @@ def _cargar_pedidos_por_estado(estados, orden="ASC", limite=None):
                 (id_pedido,)
             )
             items = cursor.fetchall()
+            for item in items:
+                cursor.execute(
+                    """SELECT inv.nombre_insumo, dpm.quitar, dpm.cantidad_extra
+                         FROM detalle_pedido_modificador dpm
+                         JOIN inventario inv ON inv.id_insumo = dpm.id_insumo
+                        WHERE dpm.id_detalle = %s
+                        ORDER BY inv.nombre_insumo""",
+                    (item["id_detalle"],)
+                )
+                item["modificadores"] = cursor.fetchall()
 
             pedidos.append({
                 "id": id_pedido,
@@ -80,7 +90,12 @@ def _cargar_pedidos_por_estado(estados, orden="ASC", limite=None):
                 "notas": fila["notas"] or "",
                 "total": float(fila["total"]),
                 "items": [
-                    {"nombre": it["nombre"], "cantidad": it["cantidad"]}
+                    {"nombre": it["nombre"], "cantidad": it["cantidad"],
+                     "modificadores": [
+                         {"nombre": m["nombre_insumo"], "quitar": bool(m["quitar"]),
+                          "extra": int(m["cantidad_extra"] or 0)}
+                         for m in it.get("modificadores", [])
+                     ]}
                     for it in items
                 ],
             })

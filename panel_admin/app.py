@@ -31,7 +31,7 @@ except ImportError:
 
 from estilos import (
     ROJO, ROJO_CLARO, ROJO_OSCURO, CREMA,
-    FILTRO_REESCALADO, resolver_carpeta_recursos, buscar_logo
+    FILTRO_REESCALADO, resolver_carpeta_recursos, buscar_logo, ejecutar_transicion, ejecutar_entrada
 )
 from basedatos.repositorio_productos import RepositorioProductos
 from panel_admin.vista_inventario import VistaInventario
@@ -97,6 +97,7 @@ class MenuAdministrador(tk.Tk):
         self.logo_sidebar_tk = None
 
         self.crear_interfaz()
+        self.after(70, lambda: ejecutar_entrada(self, duracion=230, pasos=10))
 
     # ========================================================
     # PANTALLA
@@ -284,11 +285,8 @@ class MenuAdministrador(tk.Tk):
 
     def mostrar_vista(self, vista):
 
-        self.vista_actual = vista
-        self._resaltar_boton_activo()
-
-        if self.vista_frame is not None:
-            self.vista_frame.destroy()
+        if getattr(self, "_transicionando", False):
+            return
 
         clase_vista = next(
             (clase for _i, _t, v, clase in SECCIONES if v == vista), None
@@ -297,5 +295,14 @@ class MenuAdministrador(tk.Tk):
         if clase_vista is None:
             return
 
-        self.vista_frame = clase_vista(self.contenido, self)
-        self.vista_frame.pack(fill="both", expand=True)
+        def cambiar():
+            self.vista_actual = vista
+            self._resaltar_boton_activo()
+
+            if self.vista_frame is not None:
+                self.vista_frame.destroy()
+
+            self.vista_frame = clase_vista(self.contenido, self)
+            self.vista_frame.pack(fill="both", expand=True)
+
+        ejecutar_transicion(self, cambiar, contenedor=self.contenido, duracion=280, pasos=16)

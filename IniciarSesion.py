@@ -888,7 +888,7 @@ class IniciarSesion(tk.Tk):
 
             subprocess.Popen(argumentos)
 
-            self.destroy()
+            self._fundir_y_cerrar()
 
         except Exception as e:
 
@@ -897,6 +897,39 @@ class IniciarSesion(tk.Tk):
                 f"No se pudo abrir {nombre_amigable}:\n{e}",
                 parent=self
             )
+
+    def _fundir_y_cerrar(self):
+        """Cierre breve con la misma identidad visual de Mr.Burger."""
+        try:
+            from estilos import CREMA, ROJO, ROJO_OSCURO
+            overlay = tk.Toplevel(self)
+            overlay.overrideredirect(True)
+            overlay.configure(bg=CREMA)
+            overlay.attributes("-topmost", True)
+            overlay.lift()
+            self.update_idletasks()
+            x, y = self.winfo_rootx(), self.winfo_rooty()
+            w, h = max(1, self.winfo_width()), max(1, self.winfo_height())
+            overlay.geometry(f"1x{h}+{x+w}+{y}")
+            panel = tk.Frame(overlay, bg=CREMA)
+            panel.pack(fill="both", expand=True)
+            tk.Frame(panel, bg=ROJO, height=6).pack(fill="x")
+            tk.Label(panel, text="MR.BURGER", font=("Segoe UI", 11, "bold"),
+                     fg=ROJO_OSCURO, bg=CREMA).place(relx=.5, rely=.5, anchor="center")
+
+            pasos=10
+            def ease(t): return 1 - (1-t)**3
+            def animar(i=0):
+                t=min(1.0,i/pasos)
+                ancho=max(1,int(w*ease(t)))
+                overlay.geometry(f"{ancho}x{h}+{x+w-ancho}+{y}")
+                if i<pasos:
+                    self.after(18,lambda:animar(i+1))
+                else:
+                    overlay.destroy(); self.destroy()
+            animar()
+        except Exception:
+            self.destroy()
 
     # ========================================================
     # ABRIR MENÚ PRINCIPAL (CAJERO)

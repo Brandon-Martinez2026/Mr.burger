@@ -17,6 +17,7 @@ import os
 import sys
 import tkinter as tk
 from tkinter import messagebox
+from estilos import ejecutar_entrada
 
 try:
     from PIL import Image, ImageTk
@@ -70,6 +71,8 @@ class VentanaCocina(tk.Tk):
 
         self._crear_interfaz()
 
+        self.after(70, lambda: ejecutar_entrada(self, duracion=230, pasos=10))
+
         # Primer refresco (pequeño delay para que la ventana ya
         # esté dibujada) y luego uno automático cada rato.
         self.after(200, self._refrescar_periodicamente)
@@ -83,7 +86,8 @@ class VentanaCocina(tk.Tk):
         self.attributes("-fullscreen", not estado)
 
     def salir_pantalla(self, event=None):
-        self.attributes("-fullscreen", False)
+        if messagebox.askyesno("Salir de Cocina", "¿Deseas cerrar la pantalla de Cocina?", parent=self):
+            self.destroy()
 
     # ========================================================
     # INTERFAZ

@@ -124,65 +124,133 @@ class VistaCobro(tk.Frame):
             fg=TEXTO, bg=BLANCO
         ).pack(side="left", padx=(15, 12), pady=10)
 
-        self.btn_menu_categorias = tk.Menubutton(
+        self.btn_menu_categorias = tk.Button(
             barra, font=("Segoe UI", 11, "bold"),
-            fg="white", bg=ROJO_CLARO,
-            activebackground=ROJO, activeforeground="white",
-            relief="flat", bd=0, cursor="hand2",
-            anchor="w", padx=14, pady=8, width=30,
-            direction="below"
+            fg=TEXTO, bg="#FFF9ED",
+            activebackground="#FBE8C7", activeforeground=TEXTO,
+            relief="solid", bd=1, highlightthickness=0, cursor="hand2",
+            anchor="w", padx=14, pady=8,
+            command=self._alternar_menu_categorias
         )
-        self.btn_menu_categorias.pack(side="left", pady=8)
+        self.btn_menu_categorias.pack(side="left", pady=7, ipadx=8)
 
-        # postcommand: justo antes de abrirse, se vuelve a llenar
-        # el menú con las categorías actuales de la base de datos.
-        self.menu_categorias = tk.Menu(
-            self.btn_menu_categorias, tearoff=0,
-            font=("Segoe UI", 11), bg=BLANCO, fg=TEXTO,
-            activebackground=ROJO_CLARO, activeforeground="white",
-            postcommand=self._llenar_menu_categorias
-        )
-        self.btn_menu_categorias.configure(menu=self.menu_categorias)
-
+        self.menu_categorias = None
         self._llenar_menu_categorias()
         self._actualizar_texto_boton()
 
     def _llenar_menu_categorias(self):
-        """(Re)construye las opciones del menú: \"Todos\" y luego
-        cada categoría, marcando con una palomita la activa."""
-
         self.categorias = catalogo.listar_categorias()
 
-        self.menu_categorias.delete(0, "end")
+    def _alternar_menu_categorias(self):
+        if self.menu_categorias is not None and self.menu_categorias.winfo_exists():
+            self._cerrar_menu_categorias()
+            return
+
+        self._llenar_menu_categorias()
+
+        ventana = tk.Toplevel(self)
+        ventana.overrideredirect(True)
+        ventana.configure(bg=BORDE)
+        ventana.attributes("-topmost", True)
+        self.menu_categorias = ventana
+
+        contenedor = tk.Frame(ventana, bg=BLANCO)
+        contenedor.pack(padx=1, pady=1)
+
+        encabezado = tk.Frame(contenedor, bg=BLANCO)
+        encabezado.pack(fill="x", padx=14, pady=(12, 7))
+        tk.Label(
+            encabezado, text="Selecciona una categoría",
+            font=("Segoe UI", 10, "bold"), fg=TEXTO, bg=BLANCO
+        ).pack(side="left")
 
         opciones = [("todos", "Todos", "📋")] + [
             (categoria, categoria, catalogo.icono_de_categoria(categoria))
             for categoria in self.categorias
         ]
 
+        lista = tk.Frame(contenedor, bg=BLANCO)
+        lista.pack(fill="both", padx=7, pady=(0, 7))
+
         for valor, texto, icono in opciones:
-
-            marca = "   ✔" if valor == self.categoria_actual else ""
-
-            self.menu_categorias.add_command(
-                label=f"{icono}  {texto}{marca}",
-                command=lambda v=valor: self._filtrar_categoria(v)
+            activo = valor == self.categoria_actual
+            fila = tk.Frame(
+                lista, bg=ROJO_CLARO if activo else BLANCO, cursor="hand2"
             )
+            fila.pack(fill="x", pady=1)
+
+            tk.Label(
+                fila, text=icono, font=("Segoe UI Emoji", 14),
+                fg="white" if activo else TEXTO,
+                bg=ROJO_CLARO if activo else BLANCO, width=3
+            ).pack(side="left", padx=(8, 0), pady=5)
+
+            tk.Label(
+                fila, text=texto, font=("Segoe UI", 10, "bold" if activo else "normal"),
+                fg="white" if activo else TEXTO,
+                bg=ROJO_CLARO if activo else BLANCO, anchor="w"
+            ).pack(side="left", fill="x", expand=True, padx=6, pady=5)
+
+            if activo:
+                tk.Label(
+                    fila, text="✓", font=("Segoe UI", 11, "bold"),
+                    fg="white", bg=ROJO_CLARO
+                ).pack(side="right", padx=10)
+
+            def elegir(event=None, v=valor):
+                self._filtrar_categoria(v)
+                self._cerrar_menu_categorias()
+
+            fila.bind("<Button-1>", elegir)
+            for widget in fila.winfo_children():
+                widget.bind("<Button-1>", elegir)
+
+            def entrar(event, f=fila, activo=activo):
+                if not activo:
+                    for w in f.winfo_children():
+                        w.configure(bg="#FFF4DE")
+                    f.configure(bg="#FFF4DE")
+
+            def salir(event, f=fila, activo=activo):
+                if not activo:
+                    for w in f.winfo_children():
+                        w.configure(bg=BLANCO)
+                    f.configure(bg=BLANCO)
+
+            fila.bind("<Enter>", entrar)
+            fila.bind("<Leave>", salir)
+
+        ventana.update_idletasks()
+
+        x = self.btn_menu_categorias.winfo_rootx()
+        y = self.btn_menu_categorias.winfo_rooty() + self.btn_menu_categorias.winfo_height() + 4
+        ancho = max(self.btn_menu_categorias.winfo_width(), 330)
+        alto = min(430, ventana.winfo_reqheight())
+        ventana.geometry(f"{ancho}x{alto}+{x}+{y}")
+
+        ventana.bind("<FocusOut>", lambda e: self._cerrar_menu_categorias())
+        ventana.bind("<Escape>", lambda e: self._cerrar_menu_categorias())
+        ventana.focus_force()
+
+    def _cerrar_menu_categorias(self):
+        ventana = self.menu_categorias
+        self.menu_categorias = None
+        if ventana is not None:
+            try:
+                ventana.destroy()
+            except tk.TclError:
+                pass
 
     def _actualizar_texto_boton(self):
-
         if self.categoria_actual == "todos":
             texto = "📋  Todos  ▾"
         else:
             icono = catalogo.icono_de_categoria(self.categoria_actual)
             texto = f"{icono}  {self.categoria_actual}  ▾"
-
         self.btn_menu_categorias.configure(text=texto)
 
     def _filtrar_categoria(self, categoria):
-
         self.categoria_actual = categoria
-
         self._actualizar_texto_boton()
         self.vista_productos.dibujar_productos()
 

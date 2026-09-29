@@ -79,6 +79,23 @@ def guardar_venta(venta):
                 (id_pedido, id_producto, item.get("cantidad", 1))
             )
 
+            cursor.execute("SELECT MAX(id_detalle) AS id_detalle FROM detalle_pedido WHERE id_pedido = %s", (id_pedido,))
+            fila_detalle = cursor.fetchone()
+            id_detalle = fila_detalle[0] if fila_detalle else None
+            if id_detalle is None:
+                raise ErrorVenta("No se pudo obtener el detalle del producto para guardar su personalización.")
+
+            for modificador in item.get("modificadores", []) or []:
+                cursor.execute(
+                    """INSERT INTO detalle_pedido_modificador
+                       (id_detalle, id_insumo, quitar, cantidad_extra, cantidad_por_extra)
+                       VALUES (%s, %s, %s, %s, %s)""",
+                    (id_detalle, modificador.get("id_insumo"),
+                     1 if modificador.get("quitar") else 0,
+                     int(modificador.get("extra", 0) or 0),
+                     float(modificador.get("cantidad_base", 0) or 0))
+                )
+
         metodo = venta.get("metodo_pago")
         detalle = venta.get("detalle_pago", {}) or {}
 

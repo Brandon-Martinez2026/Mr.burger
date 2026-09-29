@@ -20,6 +20,7 @@ from estilos import (
 from punto_venta import catalogo
 from punto_venta.ventana_pago import VentanaMetodoPago
 from punto_venta.ventana_dividir_cuenta import VentanaDividirCuenta
+from punto_venta.ventana_modificar_ingredientes import VentanaModificarIngredientes
 
 import datos_ventas
 from basedatos.conexion import ErrorBaseDatos
@@ -144,8 +145,16 @@ class PanelCarrito(tk.Frame):
         # NOTAS (ocultas hasta que se abren desde "Modificadores")
         # ----------------------------------------------------
 
-        self.entrada_notas = tk.Text(self, height=3, font=("Segoe UI", 10), fg=GRIS, bd=1, relief="solid")
-        self.entrada_notas.insert("1.0", "Notas")
+        self._placeholder_notas = "Notas"
+        self._notas_placeholder_activo = True
+        self.entrada_notas = tk.Text(
+            self, height=3, font=("Segoe UI", 10), fg="#9A9A9A",
+            insertbackground=TEXTO, bd=1, relief="solid",
+            wrap="word", padx=8, pady=7
+        )
+        self.entrada_notas.insert("1.0", self._placeholder_notas)
+        self.entrada_notas.bind("<FocusIn>", self._notas_focus_in)
+        self.entrada_notas.bind("<FocusOut>", self._notas_focus_out)
 
         # ----------------------------------------------------
         # DIVIDIR CUENTA / APLICAR DESCUENTO
@@ -158,13 +167,20 @@ class PanelCarrito(tk.Frame):
             botones, text="⚖\nDividir Cuenta", font=("Segoe UI", 10),
             bg=BLANCO, relief="solid", bd=1, cursor="hand2", command=self.dividir_cuenta
         )
-        self.btn_dividir_cuenta.pack(side="left", fill="x", expand=True, padx=(0, 5), ipady=8)
+        self.btn_dividir_cuenta.pack(side="left", fill="x", expand=True, padx=3, ipady=8)
 
         self.btn_descuento = tk.Button(
             botones, text="%\nAplicar Descuento", font=("Segoe UI", 10),
             bg=BLANCO, relief="solid", bd=1, cursor="hand2", command=self.abrir_descuento
         )
-        self.btn_descuento.pack(side="left", fill="x", expand=True, padx=(5, 0), ipady=8)
+        self.btn_descuento.pack(side="left", fill="x", expand=True, padx=3, ipady=8)
+
+        self.btn_modificar_ingredientes = tk.Button(
+            botones, text="🍔\nModificar Ingredientes", font=("Segoe UI", 10),
+            bg=BLANCO, relief="solid", bd=1, cursor="hand2",
+            command=self.abrir_modificar_ingredientes
+        )
+        self.btn_modificar_ingredientes.pack(side="left", fill="x", expand=True, padx=3, ipady=8)
 
         # ----------------------------------------------------
         # PAGAR
@@ -178,21 +194,16 @@ class PanelCarrito(tk.Frame):
         self.btn_pagar.pack(fill="x", padx=25, pady=10, ipady=8)
 
         # ----------------------------------------------------
-        # GUARDAR / CANCELAR
+        # CANCELAR
         # ----------------------------------------------------
 
         abajo = tk.Frame(self, bg=BLANCO)
         abajo.pack(fill="x", padx=25, pady=(0, 20))
 
         tk.Button(
-            abajo, text="Guardar Pedido", font=("Segoe UI", 10),
-            bg=BLANCO, relief="solid", bd=1, cursor="hand2", command=self.guardar_pedido
-        ).pack(side="left", fill="x", expand=True, padx=(0, 5), ipady=7)
-
-        tk.Button(
-            abajo, text="Cancelar", font=("Segoe UI", 10), bg=BLANCO,
-            relief="solid", bd=1, cursor="hand2", command=self.cancelar
-        ).pack(side="left", fill="x", expand=True, padx=(5, 0), ipady=7)
+            abajo, text="Cancelar Pedido", font=("Segoe UI", 10), bg=BLANCO,
+            fg=ROJO, relief="solid", bd=1, cursor="hand2", command=self.cancelar
+        ).pack(fill="x", ipady=7)
 
     # ========================================================
     # TIPO DE PEDIDO (MESA / PARA LLEVAR)
@@ -283,6 +294,19 @@ class PanelCarrito(tk.Frame):
     # MODIFICADORES (mostrar/ocultar notas del pedido)
     # ========================================================
 
+    def _notas_focus_in(self, _event=None):
+        if self._notas_placeholder_activo:
+            self.entrada_notas.delete("1.0", "end")
+            self.entrada_notas.configure(fg=TEXTO)
+            self._notas_placeholder_activo = False
+
+    def _notas_focus_out(self, _event=None):
+        if not self.entrada_notas.get("1.0", "end-1c").strip():
+            self.entrada_notas.delete("1.0", "end")
+            self.entrada_notas.insert("1.0", self._placeholder_notas)
+            self.entrada_notas.configure(fg="#9A9A9A")
+            self._notas_placeholder_activo = True
+
     def _alternar_notas(self):
 
         self._notas_visibles = not self._notas_visibles
@@ -333,10 +357,9 @@ class PanelCarrito(tk.Frame):
             # nombre/precio) porque DialogoPersonalizar la necesita
             # para saber qué ingredientes ofrecer al editarlo.
             "categoria": producto.get("categoria"),
-            # Personalización del producto (quitar ingredientes,
-            # instrucciones especiales). Se editan haciendo clic en
-            # la línea del carrito; ver DialogoPersonalizar.
-            "ingredientes_quitados": [],
+            # Personalización estructurada por ingrediente. Se edita
+            # haciendo clic en la línea del carrito.
+            "modificadores": [],
             "instrucciones": "",
         })
         # Nota: conservamos "id" (id_producto) en cada línea del
@@ -613,10 +636,7 @@ class PanelCarrito(tk.Frame):
             messagebox.showwarning("Mr.Burger", "No hay productos en el pedido.")
             return
 
-        notas_texto = self.entrada_notas.get("1.0", "end").strip()
-
-        if notas_texto == "Notas":
-            notas_texto = ""
+        notas_texto = "" if self._notas_placeholder_activo else self.entrada_notas.get("1.0", "end").strip()
 
         pedido = {
             "id_usuario": getattr(self.controlador, "id_usuario", None),
@@ -659,12 +679,26 @@ class PanelCarrito(tk.Frame):
         quitarle ingredientes o escribir una instrucción especial
         (por ejemplo, 'sin tomate' en una hamburguesa)."""
 
-        def _al_guardar(ingredientes_quitados, instrucciones):
-            item["ingredientes_quitados"] = ingredientes_quitados
+        def _al_guardar(modificadores, instrucciones):
+            item["modificadores"] = modificadores
             item["instrucciones"] = instrucciones
             self.actualizar_resumen()
 
         DialogoPersonalizar(self, item, _al_guardar)
+
+    # ========================================================
+    # MODIFICAR INGREDIENTES
+    # ========================================================
+
+    def abrir_modificar_ingredientes(self):
+        if not self.carrito:
+            messagebox.showwarning("Mr.Burger", "No hay productos en el pedido.")
+            return
+
+        def actualizar():
+            self.actualizar_resumen()
+
+        VentanaModificarIngredientes(self, self.carrito, actualizar)
 
     # ========================================================
     # PAGAR
@@ -688,23 +722,12 @@ class PanelCarrito(tk.Frame):
 
         subtotal, descuento_monto, total = self._calcular_totales()
 
-        notas_texto = self.entrada_notas.get("1.0", "end").strip()
-
-        if notas_texto == "Notas":
-            notas_texto = ""
+        notas_texto = "" if self._notas_placeholder_activo else self.entrada_notas.get("1.0", "end").strip()
 
         # ----------------------------------------------------
-        # PERSONALIZACIÓN DE CADA PRODUCTO (ingredientes quitados /
-        # instrucciones especiales)
-        # ----------------------------------------------------
-        # La base de datos todavía no tiene una columna de notas
-        # por línea de pedido (detalle_pedido), así que por ahora
-        # esto se agrega al texto de notas general del pedido, que
-        # sí llega a la pantalla de Cocina. Cada línea del carrito
-        # de todas formas sigue guardando su propia personalización
-        # ("ingredientes_quitados" / "instrucciones") para cuando el
-        # equipo de base de datos agregue esa columna y se pueda
-        # enviar tal cual, sin tener que rehacer esta pantalla.
+        # PERSONALIZACIÓN ESTRUCTURADA DE CADA PRODUCTO
+        # Los ingredientes se guardan como modificadores de la línea
+        # y no se mezclan con las notas generales del pedido.
         # ----------------------------------------------------
 
         lineas_personalizacion = []
@@ -713,8 +736,15 @@ class PanelCarrito(tk.Frame):
 
             partes = []
 
-            if item.get("ingredientes_quitados"):
-                partes.append("sin " + ", ".join(item["ingredientes_quitados"]).lower())
+            modificadores = item.get("modificadores") or []
+            quitados = [m["nombre"] for m in modificadores if m.get("quitar")]
+            extras = [f"extra {m['nombre']}" + (f" x{m.get('extra', 1)}" if int(m.get('extra', 1)) > 1 else "")
+                      for m in modificadores if int(m.get("extra", 0)) > 0]
+
+            if quitados:
+                partes.append("sin " + ", ".join(quitados).lower())
+            if extras:
+                partes.append(", ".join(extras).lower())
 
             if item.get("instrucciones"):
                 partes.append(item["instrucciones"])
@@ -757,11 +787,8 @@ class PanelCarrito(tk.Frame):
                     "nombre": item["nombre"],
                     "precio": item["precio"],
                     "cantidad": item["cantidad"],
-                    # Se guardan también aquí (aunque por ahora la
-                    # base de datos los ignore) para que cuando se
-                    # agregue soporte real de personalización por
-                    # producto, los datos ya estén disponibles.
-                    "ingredientes_quitados": item.get("ingredientes_quitados") or [],
+                    # Modificadores estructurados por ingrediente.
+                    "modificadores": item.get("modificadores") or [],
                     "instrucciones": item.get("instrucciones") or "",
                 }
                 for item in self.carrito
@@ -843,7 +870,9 @@ class PanelCarrito(tk.Frame):
         self.actualizar_resumen()
 
         self.entrada_notas.delete("1.0", "end")
-        self.entrada_notas.insert("1.0", "Notas")
+        self.entrada_notas.insert("1.0", self._placeholder_notas)
+        self.entrada_notas.configure(fg="#9A9A9A")
+        self._notas_placeholder_activo = True
 
         # Refresca la cuadrícula de productos para reflejar el
         # stock que se acaba de descontar en la base de datos.

@@ -7,11 +7,12 @@ ventas realizadas por cada cajero.
 """
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 
-from estilos import CREMA, BLANCO, TEXTO, GRIS, BORDE, crear_encabezado, preparar_estilo_tabla
+from estilos import CREMA, BLANCO, TEXTO, GRIS, BORDE, ROJO, ROJO_CLARO, crear_encabezado, preparar_estilo_tabla
 from panel_admin.datos_admin import METODOS_PAGO
 from panel_admin.dialogo_detalle_venta import mostrar_detalle_venta
+from basedatos.repositorio_usuarios import crear_usuario
 
 import datos_ventas
 
@@ -29,7 +30,14 @@ class VistaCajeros(tk.Frame):
     # ========================================================
     def _crear_interfaz(self):
 
-        crear_encabezado(self, "Cajeros", "Supervisa las ventas realizadas por cada cajero")
+        encabezado = crear_encabezado(self, "Cajeros", "Supervisa las ventas realizadas por cada cajero")
+
+        tk.Button(
+            encabezado, text="+ Crear Cajero / Cocinero", font=("Segoe UI", 10, "bold"),
+            bg=ROJO_CLARO, fg="white", relief="flat", bd=0, cursor="hand2",
+            activebackground=ROJO, activeforeground="white",
+            command=self._crear_personal
+        ).pack(side="right", padx=(15, 0), ipady=6, ipadx=10)
 
         cuerpo = tk.Frame(self, bg=CREMA)
         cuerpo.pack(fill="both", expand=True)
@@ -105,6 +113,78 @@ class VistaCajeros(tk.Frame):
 
         self.tabla_ventas_cajero.pack(fill="both", expand=True, padx=1, pady=(0, 1))
         self.tabla_ventas_cajero.bind("<Double-1>", lambda e: self._ver_detalle_venta())
+
+    # ========================================================
+    def _crear_personal(self):
+
+        ventana = tk.Toplevel(self)
+        ventana.title("Crear personal")
+        ventana.configure(bg=BLANCO)
+        ventana.geometry("430x430")
+        ventana.resizable(False, False)
+        ventana.transient(self)
+        ventana.grab_set()
+
+        tk.Label(
+            ventana, text="Crear Cajero / Cocinero",
+            font=("Segoe UI", 17, "bold"), fg=TEXTO, bg=BLANCO
+        ).pack(pady=(22, 4))
+
+        tk.Label(
+            ventana, text="El cajero usa el rol 'usuario' de la base de datos.",
+            font=("Segoe UI", 9), fg=GRIS, bg=BLANCO
+        ).pack(pady=(0, 18))
+
+        formulario = tk.Frame(ventana, bg=BLANCO)
+        formulario.pack(fill="x", padx=30)
+
+        campos = {}
+        for clave, texto in (("nombre", "Nombre completo"), ("usuario", "Usuario"), ("password", "Contraseña")):
+            tk.Label(
+                formulario, text=texto, font=("Segoe UI", 10, "bold"),
+                fg=TEXTO, bg=BLANCO
+            ).pack(anchor="w", pady=(5, 4))
+            entrada = tk.Entry(formulario, font=("Segoe UI", 11), bd=1, relief="solid", show="•" if clave == "password" else "")
+            entrada.pack(fill="x", ipady=7, pady=(0, 8))
+            campos[clave] = entrada
+
+        tk.Label(
+            formulario, text="Tipo de personal", font=("Segoe UI", 10, "bold"),
+            fg=TEXTO, bg=BLANCO
+        ).pack(anchor="w", pady=(3, 4))
+
+        rol = tk.StringVar(value="usuario")
+        opciones = tk.Frame(formulario, bg=BLANCO)
+        opciones.pack(fill="x", pady=(0, 15))
+
+        for valor, texto in (("usuario", "🧾 Cajero"), ("cocinero", "🧑‍🍳 Cocinero")):
+            tk.Radiobutton(
+                opciones, text=texto, variable=rol, value=valor,
+                font=("Segoe UI", 10), fg=TEXTO, bg=BLANCO,
+                activebackground=BLANCO, selectcolor=CREMA
+            ).pack(side="left", padx=(0, 25))
+
+        def guardar():
+            ok, error = crear_usuario(
+                campos["nombre"].get(), campos["usuario"].get(),
+                campos["password"].get(), rol.get()
+            )
+            if not ok:
+                messagebox.showwarning("Mr.Burger", error, parent=ventana)
+                return
+
+            messagebox.showinfo(
+                "Personal creado",
+                "La cuenta fue creada correctamente y ya puede iniciar sesión.",
+                parent=ventana
+            )
+            ventana.destroy()
+
+        tk.Button(
+            ventana, text="Crear cuenta", font=("Segoe UI", 11, "bold"),
+            bg=ROJO_CLARO, fg="white", activebackground=ROJO, activeforeground="white",
+            relief="flat", cursor="hand2", command=guardar
+        ).pack(fill="x", padx=30, ipady=9, pady=(0, 18))
 
     # ========================================================
     def _mostrar_ventas_cajero(self):

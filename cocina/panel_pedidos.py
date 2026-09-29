@@ -153,6 +153,17 @@ class PanelPedidos(tk.Frame):
                 font=("Segoe UI", 11), fg=TEXTO, bg=BLANCO, anchor="w", justify="left"
             ).pack(fill="x", pady=2)
 
+            for mod in item.get("modificadores", []):
+                if mod.get("quitar"):
+                    texto = f"   SIN {mod['nombre'].upper()}"
+                    fg = ROJO
+                else:
+                    cantidad = int(mod.get("extra", 0) or 0)
+                    texto = f"   EXTRA {mod['nombre'].upper()}" + (f" x{cantidad}" if cantidad > 1 else "")
+                    fg = NARANJA
+                tk.Label(cuerpo, text=texto, font=("Segoe UI", 9, "bold"),
+                         fg=fg, bg=BLANCO, anchor="w").pack(fill="x", pady=(0, 1))
+
         if pedido.get("notas"):
 
             tk.Label(

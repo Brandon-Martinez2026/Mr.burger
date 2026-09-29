@@ -26,7 +26,7 @@ except ImportError:
 
 from estilos import (
     ROJO, ROJO_CLARO, ROJO_OSCURO, CREMA, BLANCO,
-    FILTRO_REESCALADO, resolver_carpeta_recursos, buscar_logo
+    FILTRO_REESCALADO, resolver_carpeta_recursos, buscar_logo, ejecutar_transicion, ejecutar_entrada
 )
 from punto_venta import catalogo
 from punto_venta.vista_productos import VistaProductos
@@ -83,6 +83,7 @@ class MenuPrincipal(tk.Tk):
         self.logo_path = buscar_logo(CARPETA_LOGO, NOMBRE_LOGO)
 
         self.crear_interfaz()
+        self.after(70, lambda: ejecutar_entrada(self, duracion=230, pasos=10))
 
         # Revisa cada minuto si cambió el periodo del menú (por
         # ejemplo, de desayuno a almuerzo) para actualizar los
@@ -119,7 +120,8 @@ class MenuPrincipal(tk.Tk):
         self.attributes("-fullscreen", not estado)
 
     def salir_pantalla(self, event=None):
-        self.attributes("-fullscreen", False)
+        if messagebox.askyesno("Salir", "¿Deseas cerrar el Punto de Venta?", parent=self):
+            self.destroy()
 
     # ========================================================
     # INTERFAZ PRINCIPAL
@@ -317,7 +319,9 @@ class MenuPrincipal(tk.Tk):
             boton.configure(bg=color)
             label.configure(bg=color, font=("Segoe UI", 13, "bold" if es_activo else "normal"))
 
-        self.vista_productos.dibujar_productos()
+        def refrescar():
+            self.vista_productos.dibujar_productos()
+        ejecutar_transicion(self, refrescar, contenedor=self.contenido, duracion=220, pasos=12)
 
     # ========================================================
     # AGREGAR PRODUCTO AL CARRITO
