@@ -17,6 +17,9 @@ except ImportError:
     _PIL_DISPONIBLE = False
 
 from estilos import CREMA, BLANCO, TEXTO, GRIS, ROJO, NARANJA, BORDE
+
+# Color crema de la parte inferior de la tarjeta (nombre, descripción y precio)
+CREMA_TARJETA = "#FFF4DE"
 from punto_venta import catalogo
 import imagenes_productos
 
@@ -252,7 +255,7 @@ class VistaProductos(tk.Frame):
                 # La pegamos centrada sobre un lienzo del tamaño fijo de
                 # la tarjeta, para que todas las tarjetas midan igual
                 # aunque las fotos originales tengan proporciones distintas.
-                lienzo = Image.new("RGB", (_ANCHO_FOTO, _ALTO_FOTO), "#FFF4DE")
+                lienzo = Image.new("RGB", (_ANCHO_FOTO, _ALTO_FOTO), "#FFFFFF")
                 x = (_ANCHO_FOTO - imagen.width) // 2
                 y = (_ALTO_FOTO - imagen.height) // 2
                 lienzo.paste(imagen, (x, y))
@@ -314,7 +317,7 @@ class VistaProductos(tk.Frame):
         for producto in productos:
 
             tarjeta = tk.Frame(
-                self.productos_frame, bg=BLANCO,
+                self.productos_frame, bg=CREMA_TARJETA,
                 highlightbackground=BORDE, highlightthickness=1, cursor="hand2"
             )
 
@@ -324,28 +327,28 @@ class VistaProductos(tk.Frame):
             foto = self._foto_de_producto(producto)
 
             if foto is not None:
-                etiqueta_foto = tk.Label(tarjeta, image=foto, bg="#FFF4DE")
+                etiqueta_foto = tk.Label(tarjeta, image=foto, bg=BLANCO)
                 etiqueta_foto.image = foto  # referencia extra, por si acaso
                 etiqueta_foto.pack(fill="x", pady=(0, 8))
             else:
                 tk.Label(
-                    tarjeta, text=producto["emoji"], font=("Segoe UI Emoji", 42), bg="#FFF4DE"
+                    tarjeta, text=producto["emoji"], font=("Segoe UI Emoji", 42), bg=BLANCO
                 ).pack(fill="x", pady=(0, 8), ipady=15)
 
             tk.Label(
                 tarjeta, text=producto["nombre"], font=("Segoe UI", 13, "bold"),
-                fg=TEXTO, bg=BLANCO, justify="center"
+                fg=TEXTO, bg=CREMA_TARJETA, justify="center"
             ).pack()
 
             if producto["descripcion"]:
                 tk.Label(
                     tarjeta, text=producto["descripcion"], font=("Segoe UI", 8),
-                    fg=GRIS, bg=BLANCO, justify="center"
+                    fg=GRIS, bg=CREMA_TARJETA, justify="center"
                 ).pack(pady=2)
 
             tk.Label(
                 tarjeta, text=f"Q{producto['precio']}", font=("Segoe UI", 15, "bold"),
-                fg=ROJO, bg=BLANCO
+                fg=ROJO, bg=CREMA_TARJETA
             ).pack(pady=(3, 12))
 
             tarjeta.bind("<Button-1>", lambda e, p=producto: self.controlador.agregar_producto(p))
