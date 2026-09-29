@@ -1,29 +1,66 @@
--- =========================================================
--- mr_burguer_db_full.sql
--- ---------------------------------------------------------
--- Script base original + migraciones integradas:
---   002_extension_app.sql          (productos.emoji, pedidos.tipo_pedido/numero_mesa/notas)
---   003_cocina_y_compras.sql       (rol 'cocinero', compras/compra_detalle, sp_marcar_pedido_entregado)
---   004_descuento_y_pendientes.sql (sp_confirmar_pedido con parámetro de descuento)
+-- #########################################################
+-- MR. BURGER  |  mr_burguer_db_full.sql  (versión por bloques)
+-- #########################################################
+-- Este archivo deja la base de datos en su ESTADO FINAL.
+-- Integra el script original + las migraciones:
+--   002_extension_app.sql          -> productos.emoji, pedidos.tipo_pedido / numero_mesa / notas
+--   003_cocina_y_compras.sql       -> rol 'cocinero', compras / compra_detalle, sp_marcar_pedido_entregado
+--   004_descuento_y_pendientes.sql -> sp_confirmar_pedido con parámetro de descuento
 --
--- Este archivo reemplaza al script original + las 3 migraciones:
--- ejecutando SOLO este archivo obtienes la base de datos ya en
--- su estado final. No vuelvas a correr las migraciones sueltas
--- sobre una base creada con este script.
--- =========================================================
+-- ESTRUCTURA DEL ARCHIVO
+--   BLOQUE 1  Creación de la base de datos
+--   BLOQUE 2  Tablas
+--             2.1 Seguridad y usuarios
+--             2.2 Catálogo / menú
+--             2.3 Inventario y recetas
+--             2.4 Ventas (pedidos y pagos)
+--             2.5 Compras (migración 003)
+--   BLOQUE 3  Índices
+--   BLOQUE 4  Vistas
+--   BLOQUE 5  Triggers
+--   BLOQUE 6  Procedimientos almacenados
+--   BLOQUE 7  Datos iniciales del menú
+--             7.1 Categorías
+--             7.2 Productos individuales
+--             7.3 Combos
+--             7.4 Detalle de combos
+--             7.5 Inventario (insumos)
+--             7.6 Recetas de productos
+--             7.7 Recetas de combos (automáticas)
+--
+-- NOTA: no ejecutar las migraciones sueltas sobre una base
+--       creada con este archivo.
+-- #########################################################
 
+
+-- =========================================================
+-- BLOQUE 1: CREACIÓN DE LA BASE DE DATOS
+-- ---------------------------------------------------------
+-- Elimina la BD si ya existía y la crea de nuevo con utf8mb4
+-- (soporta tildes, ñ y emojis).
+-- ADVERTENCIA: borra TODOS los datos existentes.
+-- =========================================================
 DROP DATABASE IF EXISTS mr_burguer_db;
 CREATE DATABASE mr_burguer_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE mr_burguer_db;
 
--- Roles  (incluye 'cocinero' -> migración 003)
+
+-- =========================================================
+-- BLOQUE 2: TABLAS
+-- =========================================================
+
+-- ---------------------------------------------------------
+-- 2.1 SEGURIDAD Y USUARIOS
+-- roles: define los permisos del sistema.
+--   'cocinero' fue agregado en la migración 003.
+-- usuarios: cada usuario pertenece a un rol (por defecto 2 = 'usuario').
+-- ---------------------------------------------------------
 CREATE TABLE roles (
     id_rol      INT AUTO_INCREMENT PRIMARY KEY,
     nombre_rol  ENUM('administrador','usuario','inhabilitado','cocinero') NOT NULL UNIQUE
 );
 INSERT INTO roles (nombre_rol) VALUES ('administrador'), ('usuario'), ('inhabilitado'), ('cocinero');
 
--- Usuarios
 CREATE TABLE usuarios (
     id_usuario       INT AUTO_INCREMENT PRIMARY KEY,
     nombre_completo  VARCHAR(100) NOT NULL,
@@ -34,13 +71,20 @@ CREATE TABLE usuarios (
     FOREIGN KEY (id_rol) REFERENCES roles(id_rol)
 );
 
--- Categorias
+-- ---------------------------------------------------------
+-- 2.2 CATÁLOGO / MENÚ
+-- categorias: agrupa los productos (Hamburguesas, Bebidas, etc.).
+-- productos: platillos, combos, bebidas y extras.
+--   - emoji (migración 002) para mostrar en la app.
+--   - restringido_horario + hora_inicio/hora_fin: productos que
+--     solo se venden en cierto horario (ej. desayunos).
+-- combo_detalle: qué productos (y cuántos) incluye cada combo.
+-- ---------------------------------------------------------
 CREATE TABLE categorias (
     id_categoria     INT AUTO_INCREMENT PRIMARY KEY,
     nombre_categoria VARCHAR(50) NOT NULL UNIQUE
 );
 
--- Productos (platillos y combos)  -- incluye emoji -> migración 002
 CREATE TABLE productos (
     id_producto         INT AUTO_INCREMENT PRIMARY KEY,
     nombre_producto     VARCHAR(100) NOT NULL,
@@ -57,7 +101,6 @@ CREATE TABLE productos (
     FOREIGN KEY (id_categoria) REFERENCES categorias(id_categoria)
 );
 
--- Detalle de combos
 CREATE TABLE combo_detalle (
     id_combo_detalle     INT AUTO_INCREMENT PRIMARY KEY,
     id_combo             INT NOT NULL,
@@ -67,7 +110,11 @@ CREATE TABLE combo_detalle (
     FOREIGN KEY (id_producto_incluido) REFERENCES productos(id_producto)
 );
 
--- Inventario
+-- ---------------------------------------------------------
+-- 2.3 INVENTARIO Y RECETAS
+-- inventario: insumos reales (ingredientes) con stock actual y mínimo.
+-- producto_insumo: la "receta"; cuánto insumo consume cada producto.
+-- ---------------------------------------------------------
 CREATE TABLE inventario (
     id_insumo            INT AUTO_INCREMENT PRIMARY KEY,
     nombre_insumo        VARCHAR(100) NOT NULL,
@@ -77,7 +124,6 @@ CREATE TABLE inventario (
     fecha_actualizacion  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Receta de insumos por producto
 CREATE TABLE producto_insumo (
     id_producto_insumo INT AUTO_INCREMENT PRIMARY KEY,
     id_producto        INT NOT NULL,
@@ -87,7 +133,15 @@ CREATE TABLE producto_insumo (
     FOREIGN KEY (id_insumo) REFERENCES inventario(id_insumo)
 );
 
--- Pedidos  -- incluye tipo_pedido / numero_mesa / notas -> migración 002
+-- ---------------------------------------------------------
+-- 2.4 VENTAS (PEDIDOS Y PAGOS)
+-- pedidos: encabezado de la venta.
+--   Estados: en_proceso -> confirmado -> enviado_cocina -> entregado / cancelado
+--   tipo_pedido, numero_mesa, notas (migración 002).
+-- detalle_pedido: líneas del pedido; subtotal_linea es columna
+--   generada (cantidad x precio_unitario).
+-- pedido_pagos: permite pagos parciales y mixtos (efectivo + tarjeta).
+-- ---------------------------------------------------------
 CREATE TABLE pedidos (
     id_pedido        INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario       INT NOT NULL,
@@ -105,7 +159,6 @@ CREATE TABLE pedidos (
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
 );
 
--- Detalle de pedido
 CREATE TABLE detalle_pedido (
     id_detalle       INT AUTO_INCREMENT PRIMARY KEY,
     id_pedido        INT NOT NULL,
@@ -117,7 +170,6 @@ CREATE TABLE detalle_pedido (
     FOREIGN KEY (id_producto) REFERENCES productos(id_producto)
 );
 
--- Pagos de un pedido
 CREATE TABLE pedido_pagos (
     id_pago      INT AUTO_INCREMENT PRIMARY KEY,
     id_pedido    INT NOT NULL,
@@ -127,7 +179,12 @@ CREATE TABLE pedido_pagos (
     FOREIGN KEY (id_pedido) REFERENCES pedidos(id_pedido) ON DELETE CASCADE
 );
 
--- Compras a proveedores (reabastecimiento de inventario) -> migración 003
+-- ---------------------------------------------------------
+-- 2.5 COMPRAS A PROVEEDORES (migración 003)
+-- compras: encabezado (quién compró, proveedor, total).
+-- compra_detalle: líneas con costo unitario y subtotal generado.
+-- Sirve para reabastecer el inventario.
+-- ---------------------------------------------------------
 CREATE TABLE compras (
     id_compra    INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario   INT NOT NULL,
@@ -149,10 +206,13 @@ CREATE TABLE compra_detalle (
     FOREIGN KEY (id_producto) REFERENCES productos(id_producto)
 );
 
--- =========================================================
--- ÍNDICES
--- =========================================================
 
+-- =========================================================
+-- BLOQUE 3: ÍNDICES
+-- ---------------------------------------------------------
+-- Aceleran los JOIN (llaves foráneas) y los filtros más usados:
+-- menú disponible, pedidos por estado/fecha, inventario bajo, etc.
+-- =========================================================
 CREATE INDEX idx_productos_habilitado_horario ON productos(habilitado, restringido_horario);
 CREATE INDEX idx_productos_id_categoria ON productos(id_categoria);
 CREATE INDEX idx_usuarios_id_rol ON usuarios(id_rol);
@@ -172,6 +232,14 @@ CREATE INDEX idx_compra_detalle_id_compra ON compra_detalle(id_compra);
 CREATE INDEX idx_compra_detalle_id_producto ON compra_detalle(id_producto);
 
 
+-- =========================================================
+-- BLOQUE 4: VISTAS
+-- ---------------------------------------------------------
+-- Consultas guardadas para menú y reportes.
+-- =========================================================
+
+-- Menú disponible ahora: producto habilitado y dentro de su horario
+-- (soporta horarios que cruzan la medianoche).
 CREATE VIEW vista_menu_disponible AS
 SELECT p.*
 FROM productos p
@@ -188,6 +256,7 @@ WHERE p.habilitado = TRUE
            )
       );
 
+-- Reporte: pedidos y ventas por día (solo enviados a cocina o entregados).
 CREATE VIEW vista_reporte_ventas_diarias AS
 SELECT DATE(fecha_hora) AS fecha,
        COUNT(*)         AS total_pedidos,
@@ -196,6 +265,7 @@ FROM pedidos
 WHERE estado IN ('enviado_cocina','entregado')
 GROUP BY DATE(fecha_hora);
 
+-- Reporte: ranking de productos por unidades vendidas y dinero generado.
 CREATE VIEW vista_reporte_productos_vendidos AS
 SELECT p.nombre_producto,
        SUM(dp.cantidad)        AS unidades_vendidas,
@@ -207,9 +277,11 @@ WHERE pe.estado IN ('enviado_cocina','entregado')
 GROUP BY p.nombre_producto
 ORDER BY unidades_vendidas DESC;
 
+-- Alerta: insumos con stock igual o menor al mínimo.
 CREATE VIEW vista_inventario_bajo_minimo AS
 SELECT * FROM inventario WHERE cantidad_actual <= cantidad_minima;
 
+-- Resumen de pagos por pedido: total pagado, efectivo, tarjeta y métodos usados.
 CREATE VIEW vista_pedido_pagos_resumen AS
 SELECT pp.id_pedido,
        pe.estado,
@@ -223,8 +295,15 @@ JOIN pedidos pe ON pe.id_pedido = pp.id_pedido
 GROUP BY pp.id_pedido, pe.estado, pe.total;
 
 
+-- =========================================================
+-- BLOQUE 5: TRIGGERS (AUTOMATIZACIONES)
+-- ---------------------------------------------------------
+-- Se ejecutan solos cuando cambia una tabla.
+-- =========================================================
 DELIMITER $$
 
+-- 5.1 Al insertar / actualizar / borrar una línea de detalle_pedido,
+--     recalculan subtotal y total del pedido (suma de las líneas).
 CREATE TRIGGER trg_after_insert_detalle
 AFTER INSERT ON detalle_pedido
 FOR EACH ROW
@@ -255,6 +334,8 @@ BEGIN
     WHERE id_pedido = OLD.id_pedido;
 END$$
 
+-- 5.2 Antes de actualizar un pedido: calcula el cambio
+--     (monto_recibido - total) si el pago es efectivo o mixto.
 CREATE TRIGGER trg_before_update_pedido_pago
 BEFORE UPDATE ON pedidos
 FOR EACH ROW
@@ -266,7 +347,8 @@ BEGIN
     END IF;
 END$$
 
--- Compras: mantiene compras.total sincronizado con sus líneas -> migración 003
+-- 5.3 Compras (migración 003): mantiene compras.total
+--     sincronizado con la suma de sus líneas.
 CREATE TRIGGER trg_after_insert_compra_detalle
 AFTER INSERT ON compra_detalle
 FOR EACH ROW
@@ -282,8 +364,18 @@ END$$
 
 DELIMITER ;
 
+
+-- =========================================================
+-- BLOQUE 6: PROCEDIMIENTOS ALMACENADOS (LÓGICA DE NEGOCIO)
+-- ---------------------------------------------------------
+-- La aplicación llama a estos procedimientos en lugar de
+-- escribir INSERT/UPDATE directos, así las reglas viven en la BD.
+-- =========================================================
 DELIMITER $$
 
+-- 6.1 Agregar producto a un pedido.
+--     Valida que esté en vista_menu_disponible (habilitado y en horario)
+--     y toma el precio vigente.
 CREATE PROCEDURE sp_agregar_producto_pedido(
     IN p_id_pedido   INT,
     IN p_id_producto INT,
@@ -303,6 +395,7 @@ BEGIN
     END IF;
 END$$
 
+-- 6.2 Registrar un pago (solo si el pedido está en_proceso o confirmado).
 CREATE PROCEDURE sp_registrar_pago(
     IN p_id_pedido   INT,
     IN p_metodo_pago ENUM('efectivo','tarjeta'),
@@ -323,6 +416,7 @@ BEGIN
     END IF;
 END$$
 
+-- 6.3 Eliminar un pago (solo si el pedido aún no fue confirmado).
 CREATE PROCEDURE sp_eliminar_pago(
     IN p_id_pago INT
 )
@@ -344,8 +438,14 @@ BEGIN
     END IF;
 END$$
 
--- sp_confirmar_pedido: versión final con parámetro de descuento -> migración 004
--- (valida el pago contra subtotal - descuento y deja "total" ya con el descuento aplicado)
+-- 6.4 CONFIRMAR PEDIDO (versión final, migración 004, con descuento).
+--     Pasos:
+--       1) Valida que haya inventario suficiente para toda la receta.
+--       2) Calcula total = subtotal - descuento (mínimo 0).
+--       3) Valida que lo pagado cubra el total.
+--       4) Determina el método final (efectivo, tarjeta o mixto).
+--       5) Descuenta los insumos del inventario.
+--       6) Pasa el pedido a 'enviado_cocina' guardando total y monto recibido.
 CREATE PROCEDURE sp_confirmar_pedido(
     IN p_id_pedido INT,
     IN p_descuento DECIMAL(10,2)
@@ -358,6 +458,7 @@ BEGIN
     DECLARE v_metodo_final      ENUM('efectivo','tarjeta','mixto');
     DECLARE v_insuficiente      INT DEFAULT 0;
 
+    -- Paso 1: inventario suficiente
     SELECT COUNT(*) INTO v_insuficiente
     FROM (
         SELECT pi.id_insumo,
@@ -375,6 +476,7 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Inventario insuficiente para completar el pedido';
     END IF;
 
+    -- Paso 2: total con descuento
     SELECT subtotal INTO v_subtotal FROM pedidos WHERE id_pedido = p_id_pedido;
 
     SET v_total = v_subtotal - IFNULL(p_descuento, 0);
@@ -383,6 +485,7 @@ BEGIN
         SET v_total = 0;
     END IF;
 
+    -- Paso 3: el pago cubre el total
     SELECT COALESCE(SUM(monto), 0), COUNT(DISTINCT metodo_pago)
     INTO v_total_pagado, v_metodos_distintos
     FROM pedido_pagos
@@ -392,6 +495,7 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'El monto pagado no cubre el total del pedido';
     END IF;
 
+    -- Paso 4: método de pago final
     IF v_metodos_distintos > 1 THEN
         SET v_metodo_final = 'mixto';
     ELSE
@@ -401,6 +505,7 @@ BEGIN
         LIMIT 1;
     END IF;
 
+    -- Paso 5: descontar inventario
     UPDATE inventario inv
     JOIN (
         SELECT pi.id_insumo, SUM(pi.cantidad_requerida * dp.cantidad) AS cantidad_usada
@@ -411,6 +516,7 @@ BEGIN
     ) uso ON uso.id_insumo = inv.id_insumo
     SET inv.cantidad_actual = inv.cantidad_actual - uso.cantidad_usada;
 
+    -- Paso 6: enviar a cocina
     UPDATE pedidos
     SET estado         = 'enviado_cocina',
         metodo_pago    = v_metodo_final,
@@ -419,7 +525,7 @@ BEGIN
     WHERE id_pedido = p_id_pedido;
 END$$
 
-#pollo
+-- 6.5 Administración: cambiar el rol de un usuario usando el nombre del rol.
 CREATE PROCEDURE sp_actualizar_rol_usuario(
     IN p_id_usuario INT,
     IN p_nuevo_rol   ENUM('administrador','usuario','inhabilitado','cocinero')
@@ -430,7 +536,8 @@ BEGIN
     UPDATE usuarios SET id_rol = v_id_rol WHERE id_usuario = p_id_usuario;
 END$$
 
--- Compras: agrega línea de compra y aumenta el stock del insumo asociado -> migración 003
+-- 6.6 Compras (migración 003): agrega una línea de compra y
+--     suma el stock al insumo asociado a la receta del producto.
 CREATE PROCEDURE sp_agregar_producto_compra(
     IN p_id_compra      INT,
     IN p_id_producto    INT,
@@ -455,7 +562,8 @@ BEGIN
     END IF;
 END$$
 
--- Cocina: marca como entregado un pedido ya enviado a cocina -> migración 003
+-- 6.7 Cocina (migración 003): marca como 'entregado' un pedido
+--     que está en 'enviado_cocina'.
 CREATE PROCEDURE sp_marcar_pedido_entregado(
     IN p_id_pedido INT
 )
@@ -476,19 +584,17 @@ END$$
 
 DELIMITER ;
 
--- =========================================================
--- INSERCIÓN DE MENÚ MR. BURGER
--- Basado en el documento: Menu_MrBurger
--- Incluye: categorías, productos individuales, combos con su
--- detalle (productos que incluye cada combo) e inventario con
--- stock inicial de 350 unidades por cada producto individual.
--- =========================================================
-
-USE mr_burguer_db;
 
 -- =========================================================
--- 1) CATEGORÍAS
+-- BLOQUE 7: DATOS INICIALES DEL MENÚ MR. BURGER
+-- ---------------------------------------------------------
+-- Categorías, productos, combos, inventario y recetas.
+-- Basado en el documento Menu_MrBurger.
 -- =========================================================
+
+-- ---------------------------------------------------------
+-- 7.1 CATEGORÍAS
+-- ---------------------------------------------------------
 INSERT INTO categorias (nombre_categoria) VALUES
 ('Hamburguesas'),
 ('Extras y Acompañamientos'),
@@ -498,11 +604,11 @@ INSERT INTO categorias (nombre_categoria) VALUES
 ('Combos Individuales'),
 ('Combos Familiares');
 
--- =========================================================
--- 2) PRODUCTOS INDIVIDUALES
--- =========================================================
+-- ---------------------------------------------------------
+-- 7.2 PRODUCTOS INDIVIDUALES
+-- ---------------------------------------------------------
 
--- 2.1 Hamburguesas
+-- 7.2.1 Hamburguesas
 INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_producto) VALUES
 ('Hamburguesa Clásica',    'Carne, queso, lechuga, tomate, cebolla',            35.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Hamburguesas'), 'platillo'),
 ('Hamburguesa Doble Carne','Doble carne, doble queso, vegetales',               48.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Hamburguesas'), 'platillo'),
@@ -515,7 +621,7 @@ INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_
 -- individual en el menú, se agrega para poder registrarlo en combo_detalle.
 ('Hamburguesa Pequeña',    'Versión pequeña de hamburguesa, incluida en Combo Infantil', 20.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Hamburguesas'), 'platillo');
 
--- 2.2 Extras y acompañamientos
+-- 7.2.2 Extras y acompañamientos
 INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_producto) VALUES
 ('Papas Fritas (individual)',      'Porción mediana',                          15.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Extras y Acompañamientos'), 'extra'),
 ('Papas Fritas (grande)',          'Porción grande',                           22.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Extras y Acompañamientos'), 'extra'),
@@ -526,7 +632,7 @@ INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_
 -- Componente exclusivo del "Combo Infantil" (3 pzas), sin precio individual en el menú.
 ('Nuggets de pollo (3 pzas)',      'Con salsa a elección, incluido en Combo Infantil', 12.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Extras y Acompañamientos'), 'extra');
 
--- 2.3 Bebidas
+-- 7.2.3 Bebidas
 INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_producto) VALUES
 ('Gaseosa (12 oz)',              'Coca-Cola, Fanta, Sprite, etc.', 10.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Bebidas'), 'bebida'),
 ('Gaseosa (grande)',             '22 oz',                          15.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Bebidas'), 'bebida'),
@@ -538,7 +644,7 @@ INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_
 -- Componente exclusivo del "Combo Infantil", sin precio individual en el menú.
 ('Jugo',                         'Incluido en Combo Infantil',     10.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Bebidas'), 'bebida');
 
--- 2.4 Desayunos (con restricción de horario 06:00 - 11:00)
+-- 7.2.4 Desayunos (con restricción de horario 06:00 - 11:00)
 INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_producto, restringido_horario, hora_inicio, hora_fin) VALUES
 ('Desayuno Mr. Burger',        'Huevos, tocino, pan, café',                                              35.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Desayunos'), 'platillo', TRUE, '06:00:00', '11:00:00'),
 ('Bagel con queso crema',      NULL,                                                                      25.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Desayunos'), 'platillo', TRUE, '06:00:00', '11:00:00'),
@@ -548,17 +654,17 @@ INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_
 ('Waffle Mr. Burger',          'Waffle crujiente acompañado de tiras de pollo empanizado y miel maple',  35.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Desayunos'), 'platillo', TRUE, '06:00:00', '11:00:00'),
 ('Omelette Supremo',           'Omelette de 3 huevos relleno de jamón, queso, pimientos y cebolla',       36.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Desayunos'), 'platillo', TRUE, '06:00:00', '11:00:00');
 
--- =========================================================
--- 3) COMBOS (productos tipo 'combo')
--- =========================================================
+-- ---------------------------------------------------------
+-- 7.3 COMBOS (productos de tipo 'combo')
+-- ---------------------------------------------------------
 
--- 3.1 Combos para pareja
+-- 7.3.1 Combos para pareja
 INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_producto) VALUES
 ('Combo Pareja Clásico', '2 Hamburguesas Clásicas + 1 Papas grande + 2 Gaseosas',            95.00,  (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Pareja'), 'combo'),
 ('Combo Pareja BBQ',     '2 Hamburguesas BBQ + 1 Aros de cebolla + 2 Gaseosas',              110.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Pareja'), 'combo'),
 ('Combo Pareja Mixto',   '1 Hamburguesa Clásica + 1 Chicken Burger + Papas grande + 2 Gaseosas', 100.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Pareja'), 'combo');
 
--- 3.2 Combos individuales
+-- 7.3.2 Combos individuales
 INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_producto) VALUES
 ('Combo Clásico',      'Hamburguesa Clásica + Papas individual + Gaseosa',        55.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Individuales'), 'combo'),
 ('Combo Queso Burguesa','Queso Burguesa + Papas individual + Gaseosa',            58.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Individuales'), 'combo'),
@@ -566,7 +672,7 @@ INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_
 ('Combo Chicken',      'Chicken Burger + Papas individual + Gaseosa',             58.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Individuales'), 'combo'),
 ('Combo Infantil',     'Hamburguesa pequeña + Nuggets (3 pzas) + Jugo',           40.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Individuales'), 'combo');
 
--- 3.3 Combos familiares (4-5 personas)
+-- 7.3.3 Combos familiares (4-5 personas)
 INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_producto) VALUES
 ('Combo Familiar Clásico', '4 Hamburguesas Clásicas + 2 Papas grandes + 4 Gaseosas',                          175.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Familiares'), 'combo'),
 ('Combo Familiar BBQ',     '4 Hamburguesas BBQ + 2 Papas grandes + Aros de cebolla + 4 Gaseosas',              210.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Familiares'), 'combo'),
@@ -574,9 +680,9 @@ INSERT INTO productos (nombre_producto, descripcion, precio, id_categoria, tipo_
 -- el sistema puede permitir sustituir el tipo de hamburguesa al momento de la venta.
 ('Combo Fiesta Mr. Burger','5 Hamburguesas (mixtas a elección) + 2 Papas grandes + 6 Nuggets + 5 Gaseosas',   260.00, (SELECT id_categoria FROM categorias WHERE nombre_categoria='Combos Familiares'), 'combo');
 
--- =========================================================
--- 4) DETALLE DE COMBOS (productos que incluye cada combo)
--- =========================================================
+-- ---------------------------------------------------------
+-- 7.4 DETALLE DE COMBOS (productos que incluye cada combo)
+-- ---------------------------------------------------------
 
 -- Combo Pareja Clásico
 INSERT INTO combo_detalle (id_combo, id_producto_incluido, cantidad) VALUES
@@ -647,15 +753,13 @@ INSERT INTO combo_detalle (id_combo, id_producto_incluido, cantidad) VALUES
 ((SELECT id_producto FROM productos WHERE nombre_producto='Combo Fiesta Mr. Burger'), (SELECT id_producto FROM productos WHERE nombre_producto='Nuggets de pollo (6 pzas)'), 1),
 ((SELECT id_producto FROM productos WHERE nombre_producto='Combo Fiesta Mr. Burger'), (SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'), 5);
 
--- =========================================================
--- 5) INVENTARIO: insumos reales (ingredientes), no productos
---    Cada platillo/extra/bebida/desayuno tiene su propia
---    receta en producto_insumo con los ingredientes que
---    realmente lleva. Los combos NO tienen insumo propio:
---    su consumo se calcula sumando los insumos de los
---    productos que incluyen (ver combo_detalle más abajo).
--- =========================================================
 
+-- ---------------------------------------------------------
+-- 7.5 INVENTARIO: insumos reales (ingredientes), no productos
+--     Cada platillo/extra/bebida/desayuno tiene su propia
+--     receta en producto_insumo (7.6). Los combos NO tienen
+--     insumo propio: se calcula sumando los de sus productos (7.7).
+-- ---------------------------------------------------------
 INSERT INTO inventario (nombre_insumo, unidad_medida, cantidad_actual, cantidad_minima) VALUES
 -- Panes y bases
 ('Pan de hamburguesa',        'unidad', 500, 50),
@@ -710,10 +814,10 @@ INSERT INTO inventario (nombre_insumo, unidad_medida, cantidad_actual, cantidad_
 ('Caja para hamburguesa',       'unidad', 1000, 100);
 
 -- ---------------------------------------------------------
--- 5.1) RECETAS (producto_insumo) — productos individuales
+-- 7.6 RECETAS (producto_insumo) — productos individuales
 -- ---------------------------------------------------------
 
--- Hamburguesas
+-- 7.6.1 Hamburguesas
 INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
 ((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Clásica'),
  (SELECT id_insumo FROM inventario WHERE nombre_insumo='Pan de hamburguesa'), 1),
@@ -806,7 +910,7 @@ INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
 ((SELECT id_producto FROM productos WHERE nombre_producto='Hamburguesa Pequeña'),
  (SELECT id_insumo FROM inventario WHERE nombre_insumo='Queso cheddar (rebanada)'), 1);
 
--- Extras y acompañamientos
+-- 7.6.2 Extras y acompañamientos
 INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
 ((SELECT id_producto FROM productos WHERE nombre_producto='Papas Fritas (individual)'),
  (SELECT id_insumo FROM inventario WHERE nombre_insumo='Papa (porción individual)'), 150);
@@ -837,7 +941,7 @@ INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
 ((SELECT id_producto FROM productos WHERE nombre_producto='Nuggets de pollo (3 pzas)'),
  (SELECT id_insumo FROM inventario WHERE nombre_insumo='Salsa para nuggets'), 15);
 
--- Bebidas
+-- 7.6.3 Bebidas
 INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
 ((SELECT id_producto FROM productos WHERE nombre_producto='Gaseosa (12 oz)'),
  (SELECT id_insumo FROM inventario WHERE nombre_insumo='Jarabe de gaseosa (12oz)'), 1),
@@ -875,7 +979,7 @@ INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
 ((SELECT id_producto FROM productos WHERE nombre_producto='Jugo'),
  (SELECT id_insumo FROM inventario WHERE nombre_insumo='Vaso desechable'), 1);
 
--- Desayunos
+-- 7.6.4 Desayunos
 INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
 ((SELECT id_producto FROM productos WHERE nombre_producto='Desayuno Mr. Burger'),
  (SELECT id_insumo FROM inventario WHERE nombre_insumo='Huevo'), 2),
@@ -937,11 +1041,11 @@ INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida) VALUES
  (SELECT id_insumo FROM inventario WHERE nombre_insumo='Cebolla'), 20);
 
 -- ---------------------------------------------------------
--- 5.2) RECETAS DE LOS COMBOS
---    Se calculan automáticamente sumando: (cantidad del
---    producto dentro del combo, según combo_detalle) x
---    (insumo requerido por ese producto, cargado arriba).
---    Así un combo descuenta inventario real de ingredientes.
+-- 7.7 RECETAS DE LOS COMBOS (automáticas)
+--     Se calculan sumando: (cantidad del producto dentro del
+--     combo, según combo_detalle) x (insumo requerido por ese
+--     producto, cargado en 7.6). Así un combo descuenta
+--     inventario real de ingredientes.
 -- ---------------------------------------------------------
 INSERT INTO producto_insumo (id_producto, id_insumo, cantidad_requerida)
 SELECT cd.id_combo,
@@ -950,3 +1054,7 @@ SELECT cd.id_combo,
 FROM combo_detalle cd
 JOIN producto_insumo pi ON pi.id_producto = cd.id_producto_incluido
 GROUP BY cd.id_combo, pi.id_insumo;
+
+-- =========================================================
+-- FIN DEL SCRIPT
+-- =========================================================
